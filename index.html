@@ -204,8 +204,6 @@ function saveWishlist(wl) {
   localStorage.setItem('lego_wishlist', JSON.stringify(wl));
 }
 
-appState.wishlist = loadWishlist();
-
 window._toggleWishlist = (number, name, image) => {
   const wl = appState.wishlist;
   const idx = wl.findIndex(i => i.number === number);
@@ -274,7 +272,8 @@ window.appState = {
   period: 'all', chartInterval: 'monthly',
   suggestions: [], activeTab: 'new', usedCategory: 'misb',
   isAlertSet: false, showLowestTooltip: false,
-  wishlist: [], chart: null,
+  wishlist: (function(){ try { return JSON.parse(localStorage.getItem('lego_wishlist')||'[]'); } catch{ return []; } })(),
+  chart: null,
 };
 
 // ── API KEY MANAGEMENT ───────────────────────────────────

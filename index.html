@@ -431,6 +431,96 @@ async function callGroq(prompt) {
 }
 
 // ── ANALYZE ──────────────────────────────────────────────
+// ── PRICE CACHE ──────────────────────────────────────────
+const PRICE_CACHE_KEY = 'lego_price_cache';
+
+function getPriceCache() {
+  try { return JSON.parse(localStorage.getItem(PRICE_CACHE_KEY) || '{}'); } catch { return {}; }
+}
+function savePriceCache(setNumber, result) {
+  const cache = getPriceCache();
+  cache[setNumber] = { result, cachedAt: new Date().toISOString() };
+  try { localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(cache)); } catch(e) {
+    // 용량 초과 시 오래된 항목 제거 후 재시도
+    const keys = Object.keys(cache).sort((a,b) => (cache[a].cachedAt||'') < (cache[b].cachedAt||'') ? -1 : 1);
+    if (keys.length > 1) { delete cache[keys[0]]; localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(cache)); }
+  }
+}
+function getCachedResult(setNumber) {
+  const cache = getPriceCache();
+  return cache[setNumber] || null;
+}
+function getCacheAge(cachedAt) {
+  const ms = Date.now() - new Date(cachedAt).getTime();
+  const days = Math.floor(ms / 86400000);
+  const hours = Math.floor((ms % 86400000) / 3600000);
+  if (days > 0) return `${days}일 전`;
+  if (hours > 0) return `${hours}시간 전`;
+  return '방금 전';
+}
+window.clearPriceCache = (setNumber) => {
+  const cache = getPriceCache();
+  delete cache[setNumber];
+  localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(cache));
+};
+
+// ── PRICE REFRESH (현재 가격만 재조회) ───────────────────
+window.refreshPrices = async () => {
+  const sn = appState.setNumber;
+  const si = appState.setInfo;
+  if (!sn || !appState.result) return;
+  if (!getActiveKey()) { showError('Gemini API 키가 필요합니다.'); return; }
+
+  const refreshBtn = document.getElementById('refresh-price-btn');
+  if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = '🔄 조회 중...'; }
+
+  const cachedAt = getCachedResult(sn)?.cachedAt;
+  const sinceText = cachedAt ? `마지막 조회: ${new Date(cachedAt).toLocaleDateString('ko-KR')}` : '';
+
+  const refreshPrompt = `레고 ${sn}${si?.name ? ` (${si.name})` : ''}의 현재 쇼핑몰 가격을 조회해주세요. ${sinceText}
+
+Google Search로 "레고 ${sn} 쿠팡", "레고 ${sn} 네이버쇼핑", "레고 ${sn} 최저가" 검색.
+
+JSON만 출력 (다른 텍스트 없이):
+{
+  "malls": [{ "name": "쿠팡", "price": null, "discountRate": null, "url": "", "isLowest": false }],
+  "lowestPrice": null,
+  "lowestPriceMall": null,
+  "averagePrice": null,
+  "status": "buy|wait|hold",
+  "statusText": "이모지 한줄 진단",
+  "summary": "현재 시장 상황 요약"
+}`;
+
+  try {
+    const text = await callGemini(refreshPrompt);
+    if (!text) throw new Error('응답 없음');
+    const fresh = extractJson(text);
+    if (!fresh) throw new Error('파싱 실패');
+
+    // 캐시된 결과에 현재 가격 데이터 덮어쓰기
+    const merged = { ...appState.result, ...fresh, _refreshedAt: new Date().toISOString() };
+    // historicalData는 유지 + 새 데이터포인트 추가
+    if (fresh.malls?.length && appState.result.historicalData?.length) {
+      const newPrice = fresh.malls.find(m => m.isLowest)?.price || fresh.averagePrice || fresh.lowestPrice;
+      if (newPrice) {
+        const today = new Date().toISOString().slice(0,7) + '-01';
+        const hist = appState.result.historicalData;
+        if (!hist.find(d => d.date === today)) {
+          hist.push({ date: today, price: newPrice, mall: fresh.lowestPriceMall || '최저가', mallUrl: '', discountRate: 0 });
+        }
+        merged.historicalData = hist;
+      }
+    }
+    appState.result = merged;
+    savePriceCache(sn, merged);
+    renderResults();
+  } catch(e) {
+    if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '🔄 가격 새로고침'; }
+    showError('새로고침 실패: ' + e.message);
+  }
+};
+
 window.analyzeLego = async () => {
   const setNumber = (document.getElementById('set-number-input').value || '').trim();
   const currentPrice = (document.getElementById('price-input').value || '').trim();
@@ -452,6 +542,21 @@ window.analyzeLego = async () => {
   document.getElementById('results-section').innerHTML = '';
   setAnalyzeBtn(true, '제품 정보 조회 중...');
   appState.setInfo = await lookupSetInfo(setNumber);
+
+  // ── 캐시 확인 ──────────────────────────────────────────
+  const cached = getCachedResult(setNumber);
+  if (cached) {
+    appState.result = cached.result;
+    appState.activeTab = 'new';
+    appState.usedCategory = 'misb';
+    appState.period = 'all';
+    appState.result._cachedAt = cached.cachedAt;
+    appState.isAnalyzing = false;
+    setAnalyzeBtn(false);
+    renderResults();
+    return;
+  }
+
   setAnalyzeBtn(true);
 
   // 확인된 기본 정보 (있으면 AI에게 알려줘서 검색 없이 확정)
@@ -532,6 +637,7 @@ window.analyzeLego = async () => {
     appState.activeTab = 'new';
     appState.usedCategory = 'misb';
     appState.period = 'all';
+    savePriceCache(setNumber, parsed);
     renderResults();
   } catch (err) {
     console.error(err);
@@ -914,9 +1020,23 @@ function renderResults() {
       <div style="flex:1;min-width:180px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <div style="padding:5px 14px;background:#e53935;color:white;border-radius:9999px;font-size:10px;font-weight:900;letter-spacing:0.15em;">ANALYSIS RESULT</div>
+          ${r._cachedAt ? `
+          <div style="padding:4px 10px;background:#fef9c3;color:#92400e;border-radius:9999px;font-size:10px;font-weight:900;">
+            📦 저장된 결과 · ${getCacheAge(r._cachedAt)}
+          </div>
+          <button id="refresh-price-btn" onclick="refreshPrices()"
+            style="padding:4px 12px;background:white;color:#e53935;border:2px solid #e53935;border-radius:9999px;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;">
+            🔄 가격 새로고침
+          </button>
+          <button onclick="clearPriceCache('${sn}');analyzeLego()"
+            style="padding:4px 10px;background:white;color:#9ca3af;border:1px solid #dadce0;border-radius:9999px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;">
+            전체 재분석
+          </button>
+          ` : `
           <div style="padding:4px 10px;background:${r._usedModel==='groq'?'#f3f4f6':'#e8f5e9'};color:${r._usedModel==='groq'?'#4b5563':'#2e7d32'};border-radius:9999px;font-size:10px;font-weight:900;">
             ${r._usedModel==='groq'?'⚡ Groq (Llama)':'✨ Gemini'}
           </div>
+          `}
         </div>
         <h2 style="font-size:22px;font-weight:900;color:#3c4043;margin:0 0 8px;line-height:1.3;">${displayName}</h2>
         <div style="font-size:16px;font-weight:900;color:#e53935;">🏷️ SET #${sn}${si?.year ? ` · ${si.year}` : ''}</div>

@@ -558,6 +558,9 @@ window.analyzeLego = async (overrideInterval) => {
   appState.currentPrice = currentPrice;
   appState.isAnalyzing = true;
 
+  const knownSet = POPULAR_LEGO_SETS.find(s => s.number === setNumber);
+  const knownName = knownSet ? knownSet.name : null;
+
   const btn = document.getElementById('analyze-btn');
   btn.disabled = true;
   btn.style.opacity = '0.65';
@@ -566,7 +569,7 @@ window.analyzeLego = async (overrideInterval) => {
 
   const prompt = `당신은 레고 시장 분석 전문가입니다. 다음 레고 제품에 대한 심층적인 역사적 가격 및 중고 시장 분석을 수행해주세요.
 
-⚠️ 중요: 반드시 제품 번호 ${setNumber}번 레고 세트만 분석하세요. 다른 제품번호의 데이터를 반환하면 안 됩니다. title 필드에는 반드시 ${setNumber}번 제품의 실제 이름을 넣으세요.
+⚠️ 절대 중요: 분석 대상은 오직 LEGO ${setNumber}번 세트입니다.${knownName ? ` 이 제품의 이름은 "${knownName}"입니다.` : ''} 다른 제품번호(예: 10307 에펠탑 등)의 데이터를 절대 반환하지 마세요. title 필드에는 반드시 ${setNumber}번 제품의 실제 이름만 넣으세요.
 
 제품 번호: ${setNumber}
 사용자가 입력한 현재 가격: ${currentPrice}원

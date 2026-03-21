@@ -636,7 +636,7 @@ window.analyzeLego = async (overrideInterval) => {
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             tools: [{ "google_search": {} }],
-            generationConfig: { temperature: 0.5 }
+            generationConfig: { temperature: 0.1 }
           })
         }
       );
@@ -678,6 +678,11 @@ window.analyzeLego = async (overrideInterval) => {
       return;
     }
 
+    // DB에 있는 세트면 title/image를 강제로 덮어씌워 hallucination 방지
+    if (knownSet) {
+      parsed.title = knownSet.name;
+      parsed.imageUrl = knownSet.image;
+    }
     appState.result = parsed;
     renderResults();
   } catch (err) {

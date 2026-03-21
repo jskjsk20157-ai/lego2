@@ -177,13 +177,6 @@
     </button>
   </div>
 
-  <div style="margin-bottom:16px;">
-    <div style="font-size:11px;font-weight:900;color:#70757a;text-transform:uppercase;margin-bottom:8px;letter-spacing:0.1em;">Groq API 키 (Gemini 소진 시 대체)</div>
-    <input id="groq-key-input" type="password" placeholder="gsk_..."
-      style="width:100%;padding:8px 12px;background:#f8f9fa;border:1px solid #dadce0;border-radius:10px;font-size:12px;font-weight:700;outline:none;box-sizing:border-box;font-family:inherit;"
-      oninput="localStorage.setItem('lego_groq_key', this.value)">
-  </div>
-
   <div id="key-status-msg" style="margin-top:10px;font-size:11px;font-weight:700;color:#70757a;"></div>
 </div>
 
@@ -283,7 +276,6 @@ const invalidKeys = new Set();
 function getGeminiKeys() { return JSON.parse(localStorage.getItem('lego_gemini_keys') || '[]'); }
 function saveGeminiKeys(keys) { localStorage.setItem('lego_gemini_keys', JSON.stringify(keys)); }
 function getActiveKey() { return getGeminiKeys().find(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)) || null; }
-function getGroqKey() { return localStorage.getItem('lego_groq_key') || ''; }
 function keyStatus(k) {
   if (invalidKeys.has(k)) return { icon: '🔴', label: '오류' };
   if (exhaustedKeys.has(k)) return { icon: '🟡', label: '소진됨' };
@@ -312,12 +304,9 @@ function renderSettingsPopup() {
         </div>`;
       }).join('');
 
-  const groqInp = document.getElementById('groq-key-input');
-  groqInp.value = getGroqKey();
-
   const msg = document.getElementById('key-status-msg');
   const active = getActiveKey();
-  msg.textContent = active ? `✅ 활성 키 ${keys.filter(k=>!exhaustedKeys.has(k)&&!invalidKeys.has(k)).length}개` : getGroqKey() ? '⚡ Groq 대체 사용' : '❌ 키 없음';
+  msg.textContent = active ? `✅ 활성 키 ${keys.filter(k=>!exhaustedKeys.has(k)&&!invalidKeys.has(k)).length}개` : '❌ Gemini 키 없음';
 }
 
 window.addGeminiKey = () => {
@@ -408,25 +397,6 @@ async function callGemini(prompt) {
     }
   }
   return null; // no more Gemini keys
-}
-
-// ── GROQ CALL ────────────────────────────────────────────
-async function callGroq(prompt) {
-  const key = getGroqKey();
-  if (!key) return null;
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      response_format: { type: 'json_object' }
-    })
-  });
-  if (!res.ok) throw new Error(`Groq HTTP ${res.status}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || '';
 }
 
 // ── ANALYZE ──────────────────────────────────────────────
@@ -525,7 +495,7 @@ window.analyzeLego = async () => {
   const currentPrice = (document.getElementById('price-input').value || '').trim();
 
   if (!setNumber || !currentPrice) { showError('제품 번호와 현재 가격을 모두 입력해주세요.'); return; }
-  if (!getActiveKey() && !getGroqKey()) {
+  if (!getActiveKey()) {
     document.getElementById('settings-popup').style.display = 'block';
     renderSettingsPopup();
     showError('⚙️ API 키를 먼저 설정해주세요.');
@@ -620,13 +590,7 @@ window.analyzeLego = async () => {
     let usedModel = 'gemini';
     text = await callGemini(prompt);
     if (text === null) {
-      if (getGroqKey()) {
-        setAnalyzeBtn(true, 'Groq로 전환 중...');
-        text = await callGroq(prompt);
-        usedModel = 'groq';
-      } else {
-        throw new Error('모든 Gemini 키가 소진되었습니다. Groq 키를 설정하거나 나중에 다시 시도해주세요.');
-      }
+      throw new Error('모든 Gemini 키가 소진되었습니다. API 키를 추가하거나 나중에 다시 시도해주세요.');
     }
     if (!text) throw new Error('빈 응답을 받았습니다.');
     const parsed = extractJson(text);
@@ -1032,8 +996,8 @@ function renderResults() {
             전체 재분석
           </button>
           ` : `
-          <div style="padding:4px 10px;background:${r._usedModel==='groq'?'#f3f4f6':'#e8f5e9'};color:${r._usedModel==='groq'?'#4b5563':'#2e7d32'};border-radius:9999px;font-size:10px;font-weight:900;">
-            ${r._usedModel==='groq'?'⚡ Groq (Llama)':'✨ Gemini'}
+          <div style="padding:4px 10px;background:#e8f5e9;color:#2e7d32;border-radius:9999px;font-size:10px;font-weight:900;">
+            ✨ Gemini
           </div>
           `}
         </div>

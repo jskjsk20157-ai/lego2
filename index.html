@@ -640,7 +640,7 @@ window.analyzeLego = async (overrideInterval) => {
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             tools: [{ "google_search": {} }],
-            generationConfig: { temperature: 0.1 }
+            generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
           })
         }
       );

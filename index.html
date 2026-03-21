@@ -6,6 +6,8 @@
   <title>현명하게 레고하기</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <style>
@@ -340,7 +342,14 @@ window.onSetNumberInput = (value) => {
   if (value.length >= 2) {
     const matches = POPULAR_LEGO_SETS.filter(s =>
       s.number.includes(value) || s.name.toLowerCase().includes(value.toLowerCase())
-    ).slice(0, 8);
+    ).sort((a, b) => {
+      const aExact = a.number === value ? -1 : 0;
+      const bExact = b.number === value ? -1 : 0;
+      if (aExact !== bExact) return aExact - bExact;
+      const aStarts = a.number.startsWith(value) ? -1 : 0;
+      const bStarts = b.number.startsWith(value) ? -1 : 0;
+      return aStarts - bStarts;
+    }).slice(0, 8);
     appState.suggestions = matches;
     renderSuggestions();
     showSuggestions(matches.length > 0);
@@ -847,22 +856,17 @@ function renderResults() {
             <span style="width:30px;height:30px;background:#42a5f5;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;">📊</span>
             <span id="chart-title">새상품 가격 변동 히스토리</span>
           </h3>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <div style="display:flex;background:rgba(241,243,244,0.5);padding:5px;border-radius:10px;border:1px solid #dadce0;">
               <button id="int-monthly" onclick="setChartInterval('monthly')" style="padding:5px 11px;font-size:10px;font-weight:900;border-radius:7px;border:1px solid #dadce0;background:white;color:#42a5f5;cursor:pointer;font-family:inherit;">월별</button>
               <button id="int-weekly" onclick="setChartInterval('weekly')" style="padding:5px 11px;font-size:10px;font-weight:900;border-radius:7px;border:none;background:transparent;color:#70757a;cursor:pointer;font-family:inherit;">주별</button>
             </div>
-            <div style="display:flex;background:rgba(241,243,244,0.5);padding:5px;border-radius:10px;border:1px solid #dadce0;">
-              <button id="per-all" onclick="setPeriod('all')" style="padding:5px 11px;font-size:10px;font-weight:900;border-radius:7px;border:1px solid #dadce0;background:white;color:#e53935;cursor:pointer;font-family:inherit;">전체</button>
-              <button id="per-1y" onclick="setPeriod('1y')" style="padding:5px 11px;font-size:10px;font-weight:900;border-radius:7px;border:none;background:transparent;color:#70757a;cursor:pointer;font-family:inherit;">1년</button>
-              <button id="per-6m" onclick="setPeriod('6m')" style="padding:5px 11px;font-size:10px;font-weight:900;border-radius:7px;border:none;background:transparent;color:#70757a;cursor:pointer;font-family:inherit;">6개월</button>
-            </div>
+            <button onclick="resetChartZoom()" style="padding:5px 11px;font-size:10px;font-weight:900;border-radius:7px;border:1px solid #dadce0;background:white;color:#70757a;cursor:pointer;font-family:inherit;" title="전체 범위로 초기화">🔍 전체보기</button>
+            <span style="font-size:10px;color:#9aa0a6;font-weight:600;">휠 확대/축소 · 드래그 이동</span>
           </div>
         </div>
-        <div style="overflow-x:auto;" class="scrollbar-hide">
-          <div id="chart-wrapper" style="position:relative;">
-            <canvas id="price-chart" style="display:block;"></canvas>
-          </div>
+        <div id="chart-wrapper" style="position:relative;height:280px;cursor:grab;">
+          <canvas id="price-chart"></canvas>
         </div>
       </div>
     </div>
@@ -955,12 +959,7 @@ function getFilteredData() {
     ? (appState.result.historicalData || [])
     : (appState.result.historicalDataUsed || []);
   if (!Array.isArray(raw)) return [];
-  let data = [...raw].sort((a, b) => new Date(a.date) - new Date(b.date));
-  if (appState.period === 'all') return data;
-  const months = appState.period === '1y' ? 12 : 6;
-  const cutoff = new Date();
-  cutoff.setMonth(cutoff.getMonth() - months);
-  return data.filter(p => new Date(p.date) >= cutoff);
+  return [...raw].sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
 function updateChart() {
@@ -979,13 +978,6 @@ function updateChart() {
   canvas.style.display = 'block';
 
   const color = appState.activeTab === 'new' ? '#e53935' : '#42a5f5';
-  const containerW = wrapper.parentElement?.offsetWidth || 600;
-  const chartW = Math.max(containerW, data.length * 42);
-  canvas.width = chartW;
-  canvas.height = 280;
-  canvas.style.width = chartW + 'px';
-  canvas.style.height = '280px';
-
   const priceData = data.map(d => d.price);
   const currentPriceVal = appState.activeTab === 'new' ? Number(appState.currentPrice) : null;
 
@@ -1020,7 +1012,8 @@ function updateChart() {
       ]
     },
     options: {
-      responsive: false,
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -1041,6 +1034,17 @@ function updateChart() {
             }
           }
         },
+        zoom: {
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'x',
+          },
+          pan: {
+            enabled: true,
+            mode: 'x',
+          },
+        },
       },
       scales: {
         x: {
@@ -1059,6 +1063,8 @@ function updateChart() {
     }
   });
 }
+
+window.resetChartZoom = () => { if (appState.chart) appState.chart.resetZoom(); };
 
 // ── TAB / PERIOD / INTERVAL / USED CATEGORY ─────────────
 window.switchTab = (tab) => {
@@ -1085,16 +1091,6 @@ window.switchTab = (tab) => {
   updateChart();
 };
 
-window.setPeriod = (p) => {
-  appState.period = p;
-  ['all','1y','6m'].forEach(x => {
-    const btn = document.getElementById('per-' + x);
-    if (!btn) return;
-    if (x === p) { btn.style.background = 'white'; btn.style.color = '#e53935'; btn.style.border = '1px solid #dadce0'; }
-    else { btn.style.background = 'transparent'; btn.style.color = '#70757a'; btn.style.border = 'none'; }
-  });
-  updateChart();
-};
 
 window.setChartInterval = (interval) => {
   appState.chartInterval = interval;

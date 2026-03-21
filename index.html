@@ -326,6 +326,7 @@ async function callGemini(prompt) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }],
           generationConfig: { responseMimeType: 'application/json' }
         })
       }
@@ -441,17 +442,21 @@ window.analyzeLego = async () => {
       `;
 
   try {
-    let text = await callGemini(prompt);
+    let text = null;
+    let usedModel = 'gemini';
+    text = await callGemini(prompt);
     if (text === null) {
       if (getGroqKey()) {
         setAnalyzeBtn(true, 'Groq로 전환 중...');
         text = await callGroq(prompt);
+        usedModel = 'groq';
       } else {
         throw new Error('모든 Gemini 키가 소진되었습니다. Groq 키를 설정하거나 나중에 다시 시도해주세요.');
       }
     }
     if (!text) throw new Error('빈 응답을 받았습니다.');
     appState.result = JSON.parse(text);
+    appState.result._usedModel = usedModel;
     appState.activeTab = 'new';
     appState.usedCategory = 'misb';
     appState.period = 'all';
@@ -600,7 +605,12 @@ function renderResults() {
           onerror="this.src='https://picsum.photos/seed/${sn}/200/200'">
       </div>
       <div style="flex:1;min-width:180px;">
-        <div style="display:inline-block;padding:5px 14px;background:#e53935;color:white;border-radius:9999px;font-size:10px;font-weight:900;margin-bottom:10px;letter-spacing:0.15em;">ANALYSIS RESULT</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <div style="padding:5px 14px;background:#e53935;color:white;border-radius:9999px;font-size:10px;font-weight:900;letter-spacing:0.15em;">ANALYSIS RESULT</div>
+          <div style="padding:4px 10px;background:${r._usedModel==='groq'?'#f3f4f6':'#e8f5e9'};color:${r._usedModel==='groq'?'#4b5563':'#2e7d32'};border-radius:9999px;font-size:10px;font-weight:900;">
+            ${r._usedModel==='groq'?'⚡ Groq (Llama)':'✨ Gemini'}
+          </div>
+        </div>
         <h2 style="font-size:22px;font-weight:900;color:#3c4043;margin:0 0 8px;line-height:1.3;">${r.title || `LEGO ${sn}`}</h2>
         <div style="font-size:16px;font-weight:900;color:#e53935;">🏷️ SET #${sn}</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">

@@ -569,7 +569,11 @@ window.analyzeLego = async (overrideInterval) => {
 
   const prompt = `당신은 레고 시장 분석 전문가입니다. 다음 레고 제품에 대한 심층적인 역사적 가격 및 중고 시장 분석을 수행해주세요.
 
-⚠️ 절대 중요: 분석 대상은 오직 LEGO ${setNumber}번 세트입니다.${knownName ? ` 이 제품의 이름은 "${knownName}"입니다.` : ''} 다른 제품번호(예: 10307 에펠탑 등)의 데이터를 절대 반환하지 마세요. title 필드에는 반드시 ${setNumber}번 제품의 실제 이름만 넣으세요.
+⚠️ 절대 중요:
+- 분석 대상은 오직 LEGO 세트 번호 ${setNumber}입니다.${knownName ? ` 이 제품명은 "${knownName}"입니다.` : ''}
+- 반드시 "LEGO ${setNumber}" 또는 "레고 ${setNumber}"로 검색하여 정확한 제품명을 확인하세요.
+- 검색 결과에서 제품 번호가 ${setNumber}인 세트만 참고하세요. 다른 번호의 세트 데이터는 절대 사용하지 마세요.
+- 확실하지 않은 정보는 null로 반환하세요. 절대 추측하거나 다른 제품 데이터를 사용하지 마세요.
 
 제품 번호: ${setNumber}
 사용자가 입력한 현재 가격: ${currentPrice}원
@@ -635,6 +639,7 @@ window.analyzeLego = async (overrideInterval) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            tools: [{ "google_search": {} }],
             generationConfig: { temperature: 0.1 }
           })
         }

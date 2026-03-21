@@ -1,0 +1,5 @@
+{
+  "name": "현명하게 레고하기",
+  "description": "레고 제품 번호와 가격을 분석하여 최적의 구매 시기를 알려주는 AI 어드바이저",
+  "requestFramePermissions": []
+}

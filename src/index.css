@@ -1,0 +1,45 @@
+@import url('https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Space+Grotesk:wght@300;400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "NanumSquare", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[#FFD700] text-black antialiased;
+    font-family: 'NanumSquare', sans-serif;
+  }
+}
+
+.brutal-card {
+  @apply bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all;
+}
+
+.brutal-btn {
+  @apply border-4 border-black font-black uppercase tracking-widest shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all disabled:opacity-50;
+}
+
+.comic-bubble {
+  @apply relative bg-white border-4 border-black p-4 rounded-xl;
+}
+
+.comic-bubble::after {
+  content: '';
+  @apply absolute -bottom-4 left-8 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[16px] border-t-black;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-white border-l-4 border-black;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-black border-2 border-white;
+}

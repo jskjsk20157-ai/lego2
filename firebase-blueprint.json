@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "wishlistItem": {
+      "title": "Wishlist Item",
+      "description": "A Lego set saved by the user to their wishlist.",
+      "type": "object",
+      "properties": {
+        "number": { "type": "string", "description": "The Lego set number." },
+        "name": { "type": "string", "description": "The name of the Lego set." },
+        "image": { "type": "string", "description": "URL to the set image." },
+        "addedAt": { "type": "string", "format": "date-time", "description": "When the item was added." },
+        "uid": { "type": "string", "description": "The user ID who owns this item." }
+      },
+      "required": ["number", "name", "image", "addedAt", "uid"]
+    },
+    "analysisCache": {
+      "title": "Analysis Cache",
+      "description": "Cached Gemini analysis results for Lego sets.",
+      "type": "object",
+      "properties": {
+        "result": { "type": "object", "description": "The full analysis result JSON." },
+        "cachedAt": { "type": "string", "format": "date-time", "description": "When the analysis was cached." }
+      },
+      "required": ["result", "cachedAt"]
+    }
+  },
+  "firestore": {
+    "/wishlists/{wishlistId}": {
+      "schema": "wishlistItem",
+      "description": "User wishlist items stored in Firestore."
+    },
+    "/analysis_cache/{setNumber}": {
+      "schema": "analysisCache",
+      "description": "Cached analysis results to improve performance."
+    }
+  }
+}

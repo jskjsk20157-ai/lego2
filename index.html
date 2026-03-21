@@ -123,11 +123,19 @@
     </button>
   </div>
 
-  <div>
+  <div style="margin-bottom:16px;">
     <div style="font-size:11px;font-weight:900;color:#70757a;text-transform:uppercase;margin-bottom:8px;letter-spacing:0.1em;">Groq API 키 (Gemini 소진 시 대체)</div>
     <input id="groq-key-input" type="password" placeholder="gsk_..."
       style="width:100%;padding:8px 12px;background:#f8f9fa;border:1px solid #dadce0;border-radius:10px;font-size:12px;font-weight:700;outline:none;box-sizing:border-box;font-family:inherit;"
       oninput="localStorage.setItem('lego_groq_key', this.value)">
+  </div>
+
+  <div>
+    <div style="font-size:11px;font-weight:900;color:#70757a;text-transform:uppercase;margin-bottom:4px;letter-spacing:0.1em;">Rebrickable API 키 (제품명·브릭수 정확히)</div>
+    <div style="font-size:10px;color:#9aa0a6;margin-bottom:8px;">rebrickable.com에서 무료 발급 (1,000회/일)</div>
+    <input id="rebrickable-key-input" type="password" placeholder="..."
+      style="width:100%;padding:8px 12px;background:#f8f9fa;border:1px solid #dadce0;border-radius:10px;font-size:12px;font-weight:700;outline:none;box-sizing:border-box;font-family:inherit;"
+      oninput="localStorage.setItem('lego_rebrickable_key', this.value)">
   </div>
 
   <div id="key-status-msg" style="margin-top:10px;font-size:11px;font-weight:700;color:#70757a;"></div>
@@ -260,6 +268,7 @@ function getGeminiKeys() { return JSON.parse(localStorage.getItem('lego_gemini_k
 function saveGeminiKeys(keys) { localStorage.setItem('lego_gemini_keys', JSON.stringify(keys)); }
 function getActiveKey() { return getGeminiKeys().find(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)) || null; }
 function getGroqKey() { return localStorage.getItem('lego_groq_key') || ''; }
+function getRebrickableKey() { return localStorage.getItem('lego_rebrickable_key') || ''; }
 function keyStatus(k) {
   if (invalidKeys.has(k)) return { icon: '🔴', label: '오류' };
   if (exhaustedKeys.has(k)) return { icon: '🟡', label: '소진됨' };
@@ -290,6 +299,8 @@ function renderSettingsPopup() {
 
   const groqInp = document.getElementById('groq-key-input');
   groqInp.value = getGroqKey();
+  const rbInp = document.getElementById('rebrickable-key-input');
+  if (rbInp) rbInp.value = getRebrickableKey();
 
   const msg = document.getElementById('key-status-msg');
   const active = getActiveKey();
@@ -324,6 +335,25 @@ function extractJson(text) {
   const obj = text.match(/\{[\s\S]*\}/);
   if (obj) { try { return JSON.parse(obj[0]); } catch {} }
   return null;
+}
+
+// ── REBRICKABLE SET INFO ──────────────────────────────────
+async function fetchSetInfo(setNumber) {
+  const key = getRebrickableKey();
+  if (!key) return null;
+  try {
+    const res = await fetch(`https://rebrickable.com/api/v3/lego/sets/${setNumber}-1/`, {
+      headers: { 'Authorization': `key ${key}` }
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return {
+      name: d.name || null,
+      numParts: d.num_parts || null,
+      year: d.year || null,
+      imageUrl: d.set_img_url || null,
+    };
+  } catch { return null; }
 }
 
 // ── GEMINI CALL ──────────────────────────────────────────
@@ -398,8 +428,11 @@ window.analyzeLego = async () => {
   appState.currentPrice = currentPrice;
   appState.isAnalyzing = true;
   appState.result = null;
+  appState.setInfo = null;
   showError(null);
   document.getElementById('results-section').innerHTML = '';
+  setAnalyzeBtn(true, 'Rebrickable 조회 중...');
+  appState.setInfo = await fetchSetInfo(setNumber);
   setAnalyzeBtn(true);
 
   const prompt = `
@@ -414,7 +447,7 @@ window.analyzeLego = async () => {
         2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름, 그리고 해당 쇼핑몰의 당시 상품 URL(예상)을 포함하세요.
         3. 출시 이후부터 현재까지의 ${appState.chartInterval === 'weekly' ? '주차별' : '월별'} 가격 변동 트렌드를 조사하세요. (새상품 기준, historicalData 필드)
         4. 중고 시장(MISB 기준)의 ${appState.chartInterval === 'weekly' ? '주차별' : '월별'} 가격 변동 트렌드도 함께 조사하세요. (historicalDataUsed 필드)
-        5. 현재 유통 중인 주요 쇼핑몰의 실시간 가격과 정확한 URL을 조사하세요.
+        5. 현재 유통 중인 주요 쇼핑몰의 실시간 가격과 정확한 URL을 조사하세요. URL은 해당 레고 세트의 실제 상품 페이지 URL이어야 합니다 (메인 페이지 X, 검색결과 X). Google Search로 "${setNumber} 레고 쿠팡", "${setNumber} 레고 네이버쇼핑" 등으로 검색하여 실제 상품 URL을 찾으세요.
         6. 중고 시장 시세를 분석하세요:
            - MISB (Mint In Sealed Box): 미개봉 새제품
            - MIB (Mint In Box): 박스는 개봉했으나 내부 봉지는 미개봉
@@ -444,7 +477,7 @@ window.analyzeLego = async () => {
           "investmentScore": 85,
           "investmentReason": "...",
           "globalPrices": { "amazon": 99.99, "bricklink": 110.00, "currency": "USD" },
-          "malls": [{ "name": "...", "price": 105000, "discountRate": 15, "url": "...", "isLowest": true }],
+          "malls": [{ "name": "쿠팡", "price": 105000, "discountRate": 15, "url": "https://www.coupang.com/vp/products/실제상품ID", "isLowest": true }],
           "historicalData": [{ "date": "2023-01-01", "price": 123000, "mall": "...", "mallUrl": "...", "discountRate": 0 }],
           "historicalDataUsed": [{ "date": "2023-01-01", "price": 115000, "mall": "중고장터", "mallUrl": "", "discountRate": 0 }]
         }
@@ -595,6 +628,12 @@ function renderResults() {
   const inWL = appState.wishlist.some(i => i.number === sn);
   const fmt = (n) => typeof n === 'number' ? `₩${n.toLocaleString()}` : '정보 없음';
 
+  // Rebrickable 데이터 우선, 없으면 AI 데이터
+  const si = appState.setInfo;
+  const displayName = si?.name || r.title || `LEGO ${sn}`;
+  const displayPieces = si?.numParts || r.pieceCount || 0;
+  const displayImg = si?.imageUrl || r.imageUrl || `https://images.brickset.com/sets/images/${sn}-1.jpg`;
+
   const riskMap = {
     high:   { bg:'#fff7ed', iconBg:'#f97316', badge:'#ffedd5', badgeText:'#c2410c', label:'위험 (곧 단종)' },
     medium: { bg:'#fffbeb', iconBg:'#f59e0b', badge:'#fef9c3', badgeText:'#a16207', label:'보통 (내년 예상)' },
@@ -614,9 +653,10 @@ function renderResults() {
     <!-- Product Header Card -->
     <div style="background:rgba(255,255,255,0.95);border-radius:32px;padding:32px;border:2px solid #e53935;box-shadow:0 4px 16px rgba(229,57,53,0.12);display:flex;flex-wrap:wrap;align-items:center;gap:28px;">
       <div style="width:160px;height:160px;background:#f8f9fa;border-radius:20px;overflow:hidden;flex-shrink:0;border:2px solid #dadce0;padding:12px;box-sizing:border-box;">
-        <img src="${r.imageUrl || `https://images.brickset.com/sets/images/${sn}-1.jpg`}" alt="${r.title||''}"
+        <img src="${displayImg}" alt="${displayName}"
           style="width:100%;height:100%;object-fit:contain;" referrerpolicy="no-referrer"
-          onerror="this.src='https://picsum.photos/seed/${sn}/200/200'">
+          onerror="this.src='https://images.brickset.com/sets/images/${sn}-1.jpg'"
+          onerror="this.onerror=null;this.src='https://picsum.photos/seed/${sn}/200/200'">
       </div>
       <div style="flex:1;min-width:180px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -625,11 +665,12 @@ function renderResults() {
             ${r._usedModel==='groq'?'⚡ Groq (Llama)':'✨ Gemini'}
           </div>
         </div>
-        <h2 style="font-size:22px;font-weight:900;color:#3c4043;margin:0 0 8px;line-height:1.3;">${r.title || `LEGO ${sn}`}</h2>
-        <div style="font-size:16px;font-weight:900;color:#e53935;">🏷️ SET #${sn}</div>
+        <h2 style="font-size:22px;font-weight:900;color:#3c4043;margin:0 0 8px;line-height:1.3;">${displayName}</h2>
+        <div style="font-size:16px;font-weight:900;color:#e53935;">🏷️ SET #${sn}${si?.year ? ` · ${si.year}` : ''}</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
-          <span style="padding:4px 12px;background:#f1f3f4;border-radius:8px;font-size:12px;font-weight:700;color:#70757a;">${(r.pieceCount||0).toLocaleString()} Pieces</span>
+          <span style="padding:4px 12px;background:#f1f3f4;border-radius:8px;font-size:12px;font-weight:700;color:#70757a;">${displayPieces.toLocaleString()} Pieces</span>
           <span style="padding:4px 12px;background:#f1f3f4;border-radius:8px;font-size:12px;font-weight:700;color:#70757a;">MSRP ${typeof r.originalPrice==='number' ? `₩${r.originalPrice.toLocaleString()}` : '정보 없음'}</span>
+          ${si ? '<span style="padding:4px 12px;background:#e8f5e9;border-radius:8px;font-size:12px;font-weight:700;color:#2e7d32;">✓ Rebrickable</span>' : ''}
         </div>
       </div>
     </div>
@@ -688,7 +729,7 @@ function renderResults() {
           <span style="font-size:52px;font-weight:900;color:#d97706;line-height:1;">₩${r.ppp||0}</span>
           <span style="font-size:13px;font-weight:900;color:#70757a;margin-bottom:6px;">/ 브릭</span>
         </div>
-        <div style="font-size:12px;font-weight:700;color:#70757a;">총 부품 수: ${(r.pieceCount||0).toLocaleString()} pcs</div>
+        <div style="font-size:12px;font-weight:700;color:#70757a;">총 부품 수: ${displayPieces.toLocaleString()} pcs</div>
       </div>
     </div>
 

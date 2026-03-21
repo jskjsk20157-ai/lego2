@@ -130,18 +130,6 @@
       oninput="localStorage.setItem('lego_groq_key', this.value)">
   </div>
 
-  <div>
-    <div style="font-size:11px;font-weight:900;color:#70757a;text-transform:uppercase;margin-bottom:4px;letter-spacing:0.1em;">Brickset API 키 (제품명·브릭수·정가 정확히)</div>
-    <div style="font-size:10px;color:#9aa0a6;margin-bottom:6px;">
-      ① <a href="https://brickset.com/register" target="_blank" style="color:#1a73e8;">brickset.com 회원가입</a>
-      → ② <a href="https://brickset.com/tools/apikey/request" target="_blank" style="color:#1a73e8;">API Key 신청</a>
-      → ③ 이메일로 받은 키 입력
-    </div>
-    <input id="brickset-key-input" type="password" placeholder="키 입력 (영숫자)"
-      style="width:100%;padding:8px 12px;background:#f8f9fa;border:1px solid #dadce0;border-radius:10px;font-size:12px;font-weight:700;outline:none;box-sizing:border-box;font-family:inherit;"
-      oninput="localStorage.setItem('lego_brickset_key', this.value)">
-  </div>
-
   <div id="key-status-msg" style="margin-top:10px;font-size:11px;font-weight:700;color:#70757a;"></div>
 </div>
 
@@ -272,7 +260,6 @@ function getGeminiKeys() { return JSON.parse(localStorage.getItem('lego_gemini_k
 function saveGeminiKeys(keys) { localStorage.setItem('lego_gemini_keys', JSON.stringify(keys)); }
 function getActiveKey() { return getGeminiKeys().find(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)) || null; }
 function getGroqKey() { return localStorage.getItem('lego_groq_key') || ''; }
-function getBricksetKey() { return localStorage.getItem('lego_brickset_key') || ''; }
 function keyStatus(k) {
   if (invalidKeys.has(k)) return { icon: '🔴', label: '오류' };
   if (exhaustedKeys.has(k)) return { icon: '🟡', label: '소진됨' };
@@ -303,8 +290,6 @@ function renderSettingsPopup() {
 
   const groqInp = document.getElementById('groq-key-input');
   groqInp.value = getGroqKey();
-  const bsInp = document.getElementById('brickset-key-input');
-  if (bsInp) bsInp.value = getBricksetKey();
 
   const msg = document.getElementById('key-status-msg');
   const active = getActiveKey();
@@ -341,33 +326,39 @@ function extractJson(text) {
   return null;
 }
 
-// ── BRICKSET SET INFO ─────────────────────────────────────
-async function fetchSetInfo(setNumber) {
-  const key = getBricksetKey();
-  if (!key) return null;
+// ── LOCAL SETS DATA ───────────────────────────────────────
+let legoSetsMap = null; // { "75192": {n,t,y,p}, ... }
+
+async function loadSetsData() {
   try {
-    const params = encodeURIComponent(JSON.stringify({ setNumber }));
-    const url = `https://brickset.com/api/v3.asmx/getSets?apiKey=${encodeURIComponent(key)}&userHash=&params=${params}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const d = await res.json();
-    if (d.status !== 'success' || !d.sets?.length) return null;
-    const s = d.sets[0];
-    // MSRP: KR 없으면 US 기준 환산 (~1350원/달러)
-    const msrpKR = s.LEGOCom?.KR?.retailPrice
-      ? Math.round(s.LEGOCom.KR.retailPrice)
-      : s.LEGOCom?.US?.retailPrice
-        ? Math.round(s.LEGOCom.US.retailPrice * 1350)
-        : null;
-    return {
-      name: s.name || null,
-      numParts: s.pieces || null,
-      year: s.year || null,
-      imageUrl: s.image?.imageURL || null,
-      msrpKR,
-      theme: s.theme || null,
-      availability: s.availability || null,
-    };
+    const res = await fetch('./sets-data.json');
+    if (!res.ok) return;
+    const arr = await res.json();
+    legoSetsMap = {};
+    for (const s of arr) legoSetsMap[s.n] = s;
+  } catch { legoSetsMap = {}; }
+}
+
+// ── SET INFO LOOKUP ────────────────────────────────────────
+// 1) 로컬 DB → 2) Gemini google_search 1차 호출
+async function lookupSetInfo(setNumber) {
+  // 1. 로컬에서 먼저 찾기
+  if (legoSetsMap && legoSetsMap[setNumber]) {
+    const s = legoSetsMap[setNumber];
+    return { name: s.t, numParts: s.p, year: s.y, source: 'local' };
+  }
+
+  // 2. 로컬에 없으면 Gemini 1차 호출로 기본 정보 검색
+  if (!getActiveKey()) return null;
+  try {
+    const infoPrompt = `LEGO 세트 번호 "${setNumber}"의 기본 정보를 Google Search로 정확히 찾아주세요.
+반드시 JSON만 반환하세요 (다른 텍스트 없이):
+{"name":"제품명","pieces":부품수,"year":출시년도,"msrpKR":한국정가(숫자),"theme":"테마"}
+숫자 필드는 따옴표 없이 숫자로. 모르면 null.`;
+    const text = await callGemini(infoPrompt);
+    const d = extractJson(text);
+    if (!d || !d.name) return null;
+    return { name: d.name, numParts: d.pieces || null, year: d.year || null, msrpKR: d.msrpKR || null, source: 'search' };
   } catch { return null; }
 }
 
@@ -446,9 +437,15 @@ window.analyzeLego = async () => {
   appState.setInfo = null;
   showError(null);
   document.getElementById('results-section').innerHTML = '';
-  setAnalyzeBtn(true, 'Rebrickable 조회 중...');
-  appState.setInfo = await fetchSetInfo(setNumber);
+  setAnalyzeBtn(true, '제품 정보 조회 중...');
+  appState.setInfo = await lookupSetInfo(setNumber);
   setAnalyzeBtn(true);
+
+  // 확인된 기본 정보 (있으면 AI에게 알려줘서 검색 없이 확정)
+  const si = appState.setInfo;
+  const knownInfo = si
+    ? `\n[확정된 제품 기본 정보 - 아래 값을 그대로 사용하고 다시 검색하지 마세요]\n제품명: ${si.name}\n부품 수: ${si.numParts || '?'}개\n출시 연도: ${si.year || '?'}년${si.msrpKR ? `\n한국 정가: ₩${si.msrpKR.toLocaleString()}` : ''}`
+    : '';
 
   const prompt = `
         당신은 레고 시장 분석 전문가입니다. 다음 레고 제품에 대한 심층적인 역사적 가격 및 중고 시장 분석을 수행해주세요.
@@ -456,9 +453,10 @@ window.analyzeLego = async () => {
         제품 번호: ${setNumber}
         사용자가 입력한 현재 가격: ${currentPrice}원
         데이터 간격: ${appState.chartInterval === 'weekly' ? '주차별 (Weekly)' : '월별 (Monthly)'}
+        ${knownInfo}
 
         [분석 및 출력 요구사항]
-        1. 정가(MSRP), 부품 수(Piece Count)를 확인하세요.
+        1. 정가(MSRP), 부품 수(Piece Count)를 확인하세요${si ? ' (위 확정 정보 사용)' : ''}.
         2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름, 그리고 해당 쇼핑몰의 당시 상품 URL(예상)을 포함하세요.
         3. 출시 이후부터 현재까지의 ${appState.chartInterval === 'weekly' ? '주차별' : '월별'} 가격 변동 트렌드를 조사하세요. (새상품 기준, historicalData 필드)
         4. 중고 시장(MISB 기준)의 ${appState.chartInterval === 'weekly' ? '주차별' : '월별'} 가격 변동 트렌드도 함께 조사하세요. (historicalDataUsed 필드)
@@ -1140,6 +1138,7 @@ document.addEventListener('click', (e) => {
 // Init
 renderAuth();
 renderWishlist();
+loadSetsData();
 </script>
 </body>
 </html>

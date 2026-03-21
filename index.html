@@ -131,11 +131,15 @@
   </div>
 
   <div>
-    <div style="font-size:11px;font-weight:900;color:#70757a;text-transform:uppercase;margin-bottom:4px;letter-spacing:0.1em;">Rebrickable API 키 (제품명·브릭수 정확히)</div>
-    <div style="font-size:10px;color:#9aa0a6;margin-bottom:8px;">rebrickable.com에서 무료 발급 (1,000회/일)</div>
-    <input id="rebrickable-key-input" type="password" placeholder="..."
+    <div style="font-size:11px;font-weight:900;color:#70757a;text-transform:uppercase;margin-bottom:4px;letter-spacing:0.1em;">Brickset API 키 (제품명·브릭수·정가 정확히)</div>
+    <div style="font-size:10px;color:#9aa0a6;margin-bottom:6px;">
+      ① <a href="https://brickset.com/register" target="_blank" style="color:#1a73e8;">brickset.com 회원가입</a>
+      → ② <a href="https://brickset.com/tools/apikey/request" target="_blank" style="color:#1a73e8;">API Key 신청</a>
+      → ③ 이메일로 받은 키 입력
+    </div>
+    <input id="brickset-key-input" type="password" placeholder="키 입력 (영숫자)"
       style="width:100%;padding:8px 12px;background:#f8f9fa;border:1px solid #dadce0;border-radius:10px;font-size:12px;font-weight:700;outline:none;box-sizing:border-box;font-family:inherit;"
-      oninput="localStorage.setItem('lego_rebrickable_key', this.value)">
+      oninput="localStorage.setItem('lego_brickset_key', this.value)">
   </div>
 
   <div id="key-status-msg" style="margin-top:10px;font-size:11px;font-weight:700;color:#70757a;"></div>
@@ -268,7 +272,7 @@ function getGeminiKeys() { return JSON.parse(localStorage.getItem('lego_gemini_k
 function saveGeminiKeys(keys) { localStorage.setItem('lego_gemini_keys', JSON.stringify(keys)); }
 function getActiveKey() { return getGeminiKeys().find(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)) || null; }
 function getGroqKey() { return localStorage.getItem('lego_groq_key') || ''; }
-function getRebrickableKey() { return localStorage.getItem('lego_rebrickable_key') || ''; }
+function getBricksetKey() { return localStorage.getItem('lego_brickset_key') || ''; }
 function keyStatus(k) {
   if (invalidKeys.has(k)) return { icon: '🔴', label: '오류' };
   if (exhaustedKeys.has(k)) return { icon: '🟡', label: '소진됨' };
@@ -299,8 +303,8 @@ function renderSettingsPopup() {
 
   const groqInp = document.getElementById('groq-key-input');
   groqInp.value = getGroqKey();
-  const rbInp = document.getElementById('rebrickable-key-input');
-  if (rbInp) rbInp.value = getRebrickableKey();
+  const bsInp = document.getElementById('brickset-key-input');
+  if (bsInp) bsInp.value = getBricksetKey();
 
   const msg = document.getElementById('key-status-msg');
   const active = getActiveKey();
@@ -337,21 +341,32 @@ function extractJson(text) {
   return null;
 }
 
-// ── REBRICKABLE SET INFO ──────────────────────────────────
+// ── BRICKSET SET INFO ─────────────────────────────────────
 async function fetchSetInfo(setNumber) {
-  const key = getRebrickableKey();
+  const key = getBricksetKey();
   if (!key) return null;
   try {
-    const res = await fetch(`https://rebrickable.com/api/v3/lego/sets/${setNumber}-1/`, {
-      headers: { 'Authorization': `key ${key}` }
-    });
+    const params = encodeURIComponent(JSON.stringify({ setNumber }));
+    const url = `https://brickset.com/api/v3.asmx/getSets?apiKey=${encodeURIComponent(key)}&userHash=&params=${params}`;
+    const res = await fetch(url);
     if (!res.ok) return null;
     const d = await res.json();
+    if (d.status !== 'success' || !d.sets?.length) return null;
+    const s = d.sets[0];
+    // MSRP: KR 없으면 US 기준 환산 (~1350원/달러)
+    const msrpKR = s.LEGOCom?.KR?.retailPrice
+      ? Math.round(s.LEGOCom.KR.retailPrice)
+      : s.LEGOCom?.US?.retailPrice
+        ? Math.round(s.LEGOCom.US.retailPrice * 1350)
+        : null;
     return {
-      name: d.name || null,
-      numParts: d.num_parts || null,
-      year: d.year || null,
-      imageUrl: d.set_img_url || null,
+      name: s.name || null,
+      numParts: s.pieces || null,
+      year: s.year || null,
+      imageUrl: s.image?.imageURL || null,
+      msrpKR,
+      theme: s.theme || null,
+      availability: s.availability || null,
     };
   } catch { return null; }
 }
@@ -628,11 +643,12 @@ function renderResults() {
   const inWL = appState.wishlist.some(i => i.number === sn);
   const fmt = (n) => typeof n === 'number' ? `₩${n.toLocaleString()}` : '정보 없음';
 
-  // Rebrickable 데이터 우선, 없으면 AI 데이터
+  // Brickset 데이터 우선, 없으면 AI 데이터
   const si = appState.setInfo;
   const displayName = si?.name || r.title || `LEGO ${sn}`;
   const displayPieces = si?.numParts || r.pieceCount || 0;
   const displayImg = si?.imageUrl || r.imageUrl || `https://images.brickset.com/sets/images/${sn}-1.jpg`;
+  const displayMsrp = si?.msrpKR || r.originalPrice || null;
 
   const riskMap = {
     high:   { bg:'#fff7ed', iconBg:'#f97316', badge:'#ffedd5', badgeText:'#c2410c', label:'위험 (곧 단종)' },
@@ -669,8 +685,8 @@ function renderResults() {
         <div style="font-size:16px;font-weight:900;color:#e53935;">🏷️ SET #${sn}${si?.year ? ` · ${si.year}` : ''}</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
           <span style="padding:4px 12px;background:#f1f3f4;border-radius:8px;font-size:12px;font-weight:700;color:#70757a;">${displayPieces.toLocaleString()} Pieces</span>
-          <span style="padding:4px 12px;background:#f1f3f4;border-radius:8px;font-size:12px;font-weight:700;color:#70757a;">MSRP ${typeof r.originalPrice==='number' ? `₩${r.originalPrice.toLocaleString()}` : '정보 없음'}</span>
-          ${si ? '<span style="padding:4px 12px;background:#e8f5e9;border-radius:8px;font-size:12px;font-weight:700;color:#2e7d32;">✓ Rebrickable</span>' : ''}
+          <span style="padding:4px 12px;background:#f1f3f4;border-radius:8px;font-size:12px;font-weight:700;color:#70757a;">MSRP ${displayMsrp ? `₩${Math.round(displayMsrp).toLocaleString()}` : '정보 없음'}</span>
+          ${si ? '<span style="padding:4px 12px;background:#e8f5e9;border-radius:8px;font-size:12px;font-weight:700;color:#2e7d32;">✓ Brickset</span>' : ''}
         </div>
       </div>
     </div>

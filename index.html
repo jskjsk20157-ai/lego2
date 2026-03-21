@@ -72,7 +72,7 @@
           <span style="position:absolute; left:18px; top:50%; transform:translateY(-50%); font-size:18px; pointer-events:none;">💰</span>
           <input id="current-price-input" type="number" placeholder="원 단위 입력"
             style="width:100%; padding:16px 20px 16px 50px; background:#f8f9fa; border:2px solid #dadce0; border-radius:16px; font-size:17px; font-weight:700; outline:none; box-sizing:border-box; transition:border-color 0.2s;"
-            onfocus="this.style.borderColor='#42a5f5'" onblur="this.style.borderColor='#dadce0'"
+            onfocus="this.style.borderColor='#42a5f5'" onblur="this.style.borderColor='#dadce0'; autoAnalyze();"
             onkeydown="if(event.key==='Enter')analyzeLego()">
         </div>
       </div>
@@ -130,8 +130,21 @@
       onmouseover="this.style.borderColor='#e53935'; this.style.color='#e53935';"
       onmouseout="this.style.borderColor='#dadce0'; this.style.color='#70757a';">+ 키 추가 (최대 4개)</button>
   </div>
-  <div style="font-size:10px; color:#9aa0a6; line-height:1.5; border-top:1px solid #f1f3f4; padding-top:10px;">
-    키가 여러 개면 한도 초과 시 자동으로 다음 키로 전환됩니다.
+  <div style="border-top:1px solid #f1f3f4; padding-top:14px; margin-top:4px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:12px; font-weight:700; color:#70757a;">Groq Key <span style="color:#9aa0a6; font-weight:600;">(Gemini 소진 시 백업)</span></span>
+      <a href="https://console.groq.com/keys" target="_blank" style="font-size:11px; color:#42a5f5; text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">발급 →</a>
+    </div>
+    <div style="position:relative;">
+      <input id="groqKeyInput" type="password" placeholder="gsk_..."
+        style="width:100%; padding:10px 40px 10px 12px; border:2px solid #dadce0; border-radius:12px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; font-family:inherit; transition:border-color 0.15s;"
+        onfocus="this.style.borderColor='#42a5f5'" onblur="this.style.borderColor='#dadce0'"
+        oninput="syncGroqKey()">
+      <span id="groqKeyStatus" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:12px;"></span>
+    </div>
+  </div>
+  <div style="font-size:10px; color:#9aa0a6; line-height:1.5; padding-top:10px;">
+    Gemini 키가 여러 개면 한도 초과 시 자동 전환, 모두 소진되면 Groq로 폴백됩니다.
   </div>
 </div>
 
@@ -387,12 +400,24 @@ function saveGeminiKeys(keys) {
 function getActiveKey() {
   return getGeminiKeys().find(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)) || null;
 }
+function getGroqKey() { return localStorage.getItem('lego_groq_key') || ''; }
+window.syncGroqKey = () => {
+  const val = document.getElementById('groqKeyInput')?.value.trim() || '';
+  localStorage.setItem('lego_groq_key', val);
+  const statusEl = document.getElementById('groqKeyStatus');
+  if (statusEl) statusEl.textContent = val.length > 6 ? '✅' : '';
+};
+
 function markKeyExhausted(key) {
   exhaustedKeys.add(key);
   const remaining = getGeminiKeys().filter(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)).length;
-  showError(remaining > 0
-    ? `키 한도 초과 → 다음 키로 전환 (${remaining}개 남음). 다시 분석해주세요.`
-    : '모든 키가 한도 초과됐습니다. 잠시 후 다시 시도하세요.');
+  if (remaining > 0) {
+    showError(`Gemini 키 한도 초과 → 다음 키로 전환 (${remaining}개 남음). 다시 분석해주세요.`);
+  } else if (getGroqKey()) {
+    showError('Gemini 키 모두 소진 → Groq로 전환합니다. 다시 분석해주세요.');
+  } else {
+    showError('Gemini 키 모두 소진됐습니다. ⚙️에서 Groq 키를 추가하거나 잠시 후 재시도하세요.');
+  }
   renderGeminiKeysList();
 }
 function markKeyInvalid(key) {
@@ -400,8 +425,30 @@ function markKeyInvalid(key) {
   const remaining = getGeminiKeys().filter(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)).length;
   showError(remaining > 0
     ? `키 오류 → 다음 키로 전환 (${remaining}개 남음). 다시 분석해주세요.`
-    : '유효한 키가 없습니다. ⚙️에서 키를 확인해주세요.');
+    : getGroqKey() ? 'Gemini 키 오류 → Groq로 전환합니다. 다시 분석해주세요.' : '유효한 키가 없습니다. ⚙️에서 키를 확인해주세요.');
   renderGeminiKeysList();
+}
+
+async function callGroq(prompt) {
+  const key = getGroqKey();
+  if (!key) throw new Error('Groq 키가 없습니다.');
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.5,
+      max_tokens: 4096,
+      response_format: { type: 'json_object' }
+    })
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error?.message || `Groq HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
 }
 
 window.addGeminiKeyRow = (existingVal = '') => {
@@ -478,7 +525,14 @@ window.toggleKeyPopup = () => {
   if (!popup) return;
   const isHidden = popup.style.display === 'none';
   popup.style.display = isHidden ? 'block' : 'none';
-  if (isHidden) renderGeminiKeysList();
+  if (isHidden) {
+    renderGeminiKeysList();
+    // Load Groq key
+    const groqInp = document.getElementById('groqKeyInput');
+    const groqStatus = document.getElementById('groqKeyStatus');
+    if (groqInp) groqInp.value = getGroqKey();
+    if (groqStatus) groqStatus.textContent = getGroqKey().length > 6 ? '✅' : '';
+  }
 };
 
 // ── ANALYZE ─────────────────────────────────────────────
@@ -488,7 +542,7 @@ window.analyzeLego = async (overrideInterval) => {
   showError('');
 
   if (!setNumber || !currentPrice) { showError('제품 번호와 현재 가격을 모두 입력해주세요.'); return; }
-  if (!getActiveKey()) { toggleKeyPopup(); showError('⚙️ Gemini API 키를 먼저 설정해주세요.'); return; }
+  if (!getActiveKey() && !getGroqKey()) { toggleKeyPopup(); showError('⚙️ API 키를 먼저 설정해주세요.'); return; }
 
   const interval = overrideInterval || appState.chartInterval;
   appState.setNumber = setNumber;
@@ -546,51 +600,69 @@ window.analyzeLego = async (overrideInterval) => {
   "historicalDataUsed": [{ "date": "2023-01-01", "price": 115000, "mall": "중고장터", "mallUrl": "", "discountRate": 0 }]
 }`;
 
+  const tryParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
+  function extractJson(text) {
+    let parsed = tryParse(text);
+    if (!parsed) { const m = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/); if (m) parsed = tryParse(m[1]); }
+    if (!parsed) { const m = text.match(/\{[\s\S]*\}/); if (m) parsed = tryParse(m[0]); }
+    return parsed;
+  }
+
   const activeKey = getActiveKey();
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${activeKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          tools: [{ "google_search": {} }],
-          generationConfig: { temperature: 0.5 }
-        })
-      }
-    );
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      const msg = errJson?.error?.message || `HTTP ${res.status}`;
-      if (res.status === 429 || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
-        markKeyExhausted(activeKey);
-        return;
-      }
-      if (res.status === 400 && (msg.includes('API_KEY') || msg.includes('API key'))) {
-        markKeyInvalid(activeKey);
-        return;
-      }
-      throw new Error(msg);
-    }
-
-    const data = await res.json();
-    let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Try to extract JSON
     let parsed = null;
-    const tryParse = (s) => { try { return JSON.parse(s); } catch { return null; } };
-    parsed = tryParse(text);
-    if (!parsed) {
-      const mdMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (mdMatch) parsed = tryParse(mdMatch[1]);
+
+    if (activeKey) {
+      // ── Gemini (with Search Grounding) ──────────────────
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${activeKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            tools: [{ "google_search": {} }],
+            generationConfig: { temperature: 0.5 }
+          })
+        }
+      );
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const msg = errJson?.error?.message || `HTTP ${res.status}`;
+        if (res.status === 429 || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+          markKeyExhausted(activeKey);
+          // Auto-retry with Groq if available
+          if (getGroqKey()) {
+            btn.innerHTML = '<span class="animate-spin">⟳</span>&nbsp; Groq로 전환 중...';
+            showError('');
+            const groqText = await callGroq(prompt);
+            parsed = extractJson(groqText);
+            if (!parsed) throw new Error('Groq 응답 파싱 실패.');
+          } else { return; }
+        } else if (res.status === 400 && (msg.includes('API_KEY') || msg.includes('API key'))) {
+          markKeyInvalid(activeKey);
+          return;
+        } else {
+          throw new Error(msg);
+        }
+      } else {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        parsed = extractJson(text);
+        if (!parsed) throw new Error('JSON 파싱 실패. 다시 시도해주세요.');
+      }
+    } else if (getGroqKey()) {
+      // ── Groq 직접 (Gemini 키 없을 때) ──────────────────
+      btn.innerHTML = '<span class="animate-spin">⟳</span>&nbsp; Groq로 분석 중...';
+      const groqText = await callGroq(prompt);
+      parsed = extractJson(groqText);
+      if (!parsed) throw new Error('Groq 응답 파싱 실패.');
+    } else {
+      toggleKeyPopup();
+      showError('⚙️ API 키를 먼저 설정해주세요.');
+      return;
     }
-    if (!parsed) {
-      const objMatch = text.match(/\{[\s\S]*\}/);
-      if (objMatch) parsed = tryParse(objMatch[0]);
-    }
-    if (!parsed) throw new Error('JSON 파싱 실패. 다시 시도해주세요.');
 
     appState.result = parsed;
     renderResults();
@@ -1068,6 +1140,16 @@ function showError(msg) {
   if (!el) return;
   el.style.display = msg ? 'block' : 'none';
   el.textContent = msg;
+}
+
+// ── AUTO ANALYZE ────────────────────────────────────────
+// 제품번호 + 현재가 둘 다 입력됐을 때 자동 실행
+function autoAnalyze() {
+  const setNumber = (document.getElementById('set-number-input').value || '').trim();
+  const currentPrice = (document.getElementById('current-price-input').value || '').trim();
+  if (setNumber && currentPrice && !appState.isAnalyzing) {
+    analyzeLego();
+  }
 }
 
 // ── INIT ────────────────────────────────────────────────

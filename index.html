@@ -581,16 +581,41 @@ function renderWishlist() {
 window.onSetInput = (val) => {
   appState.setNumber = val;
   if (val.length >= 2) {
-    const matches = SETS.filter(s =>
-      s.number.includes(val) || s.name.toLowerCase().includes(val.toLowerCase())
-    ).sort((a, b) => {
+    const v = val.toLowerCase();
+    // SETS(기존 50개, 이미지+한국어명 있음)를 Map으로 먼저
+    const seen = new Set();
+    const matches = [];
+    for (const s of SETS) {
+      if (s.number.includes(val) || s.name.toLowerCase().includes(v)) {
+        seen.add(s.number);
+        matches.push({ number: s.number, name: s.name, year: s.year, image: s.image });
+      }
+    }
+    // legoSetsMap(4311개)에서 추가 검색
+    if (legoSetsMap) {
+      for (const s of Object.values(legoSetsMap)) {
+        if (matches.length >= 8) break;
+        if (seen.has(s.n)) continue;
+        if (s.n.includes(val) || s.t.toLowerCase().includes(v)) {
+          seen.add(s.n);
+          matches.push({
+            number: s.n,
+            name: s.t,
+            year: s.y ? String(s.y) : '',
+            image: `https://images.brickset.com/sets/images/${s.n}-1.jpg`
+          });
+        }
+      }
+    }
+    // 정렬: 번호 정확 일치 > 번호 시작 > 나머지
+    matches.sort((a, b) => {
       if (a.number === val) return -1; if (b.number === val) return 1;
       if (a.number.startsWith(val)) return -1; if (b.number.startsWith(val)) return 1;
       return 0;
-    }).slice(0, 8);
-    appState.suggestions = matches;
+    });
+    appState.suggestions = matches.slice(0, 8);
     renderSuggestions();
-    showSugg(matches.length > 0);
+    showSugg(appState.suggestions.length > 0);
   } else {
     appState.suggestions = [];
     showSugg(false);
@@ -635,17 +660,18 @@ function renderResults() {
   const r = appState.result;
   if (!r) return;
   const sn = appState.setNumber;
-  const found = SETS.find(s => s.number === sn);
+  const found = SETS.find(s => s.number === sn) || (legoSetsMap?.[sn] ? { number: sn, name: legoSetsMap[sn].t, year: legoSetsMap[sn].y, image: `https://images.brickset.com/sets/images/${sn}-1.jpg` } : null);
   const wName = (found?.name || `LEGO ${sn}`).replace(/'/g, "\\'");
-  const wImg = found?.image || `https://picsum.photos/seed/${sn}/200/200`;
+  const wImg = found?.image || `https://images.brickset.com/sets/images/${sn}-1.jpg`;
   const inWL = appState.wishlist.some(i => i.number === sn);
   const fmt = (n) => typeof n === 'number' ? `₩${n.toLocaleString()}` : '정보 없음';
 
-  // Brickset 데이터 우선, 없으면 AI 데이터
+  // 로컬 DB > setInfo(API/검색) > AI 데이터 순으로 우선순위
   const si = appState.setInfo;
-  const displayName = si?.name || r.title || `LEGO ${sn}`;
-  const displayPieces = si?.numParts || r.pieceCount || 0;
-  const displayImg = si?.imageUrl || r.imageUrl || `https://images.brickset.com/sets/images/${sn}-1.jpg`;
+  const localSet = legoSetsMap?.[sn];
+  const displayName = si?.name || localSet?.t || r.title || `LEGO ${sn}`;
+  const displayPieces = si?.numParts || localSet?.p || r.pieceCount || 0;
+  const displayImg = si?.imageUrl || `https://images.brickset.com/sets/images/${sn}-1.jpg`;
   const displayMsrp = si?.msrpKR || r.originalPrice || null;
 
   const riskMap = {

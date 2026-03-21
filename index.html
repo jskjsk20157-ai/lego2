@@ -646,6 +646,26 @@ window.handleKey = (e) => {
   if (e.key === 'Escape') showSugg(false);
 };
 
+// ── MALL SEARCH URL ───────────────────────────────────────
+function getMallUrl(mallName, setNumber) {
+  const q = encodeURIComponent(`레고 ${setNumber}`);
+  const qEn = encodeURIComponent(`LEGO ${setNumber}`);
+  const n = (mallName || '').toLowerCase();
+  if (n.includes('쿠팡'))       return `https://www.coupang.com/np/search?q=${q}`;
+  if (n.includes('네이버'))      return `https://search.shopping.naver.com/search/all?query=${q}`;
+  if (n.includes('11번가'))     return `https://search.11st.co.kr/Search.tmall?kwd=${q}`;
+  if (n.includes('gmarket') || n.includes('지마켓')) return `https://search.gmarket.co.kr/search?keyword=${q}`;
+  if (n.includes('옥션'))       return `https://browse.auction.co.kr/search?keyword=${q}`;
+  if (n.includes('ssg') || n.includes('신세계')) return `https://www.ssg.com/search.ssg?target=all&query=${q}`;
+  if (n.includes('롯데'))       return `https://www.lotteon.com/search/search.do?searchKeyword=${q}`;
+  if (n.includes('amazon'))     return `https://www.amazon.com/s?k=${qEn}`;
+  if (n.includes('bricklink'))  return `https://www.bricklink.com/v2/catalog/catalogitem.page?S=${setNumber}-1`;
+  if (n.includes('레고') || n.includes('lego공식')) return `https://www.lego.com/ko-kr/search?q=${setNumber}`;
+  if (n.includes('번가'))       return `https://search.11st.co.kr/Search.tmall?kwd=${q}`;
+  // 기타 쇼핑몰은 네이버쇼핑 검색으로
+  return `https://search.shopping.naver.com/search/all?query=${q}`;
+}
+
 // ── RESULTS RENDER ────────────────────────────────────────
 function renderResults() {
   const r = appState.result;
@@ -877,7 +897,7 @@ function renderResults() {
       </div>
       <div>
         ${(r.malls||[]).map(mall => `
-          <a href="${mall.url||'#'}" target="_blank" rel="noopener noreferrer"
+          <a href="${getMallUrl(mall.name, sn)}" target="_blank" rel="noopener noreferrer"
             style="padding:24px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f3f4;text-decoration:none;transition:background 0.1s;"
             onmouseover="this.style.background='rgba(255,249,229,0.5)'" onmouseout="this.style.background='transparent'">
             <div style="display:flex;align-items:center;gap:20px;">
@@ -1027,7 +1047,7 @@ function updateChart() {
               const lines = [`가격: ₩${item.raw.toLocaleString()}`];
               if (d?.mall) lines.push(`판매처: ${d.mall}`);
               if (d?.discountRate) lines.push(`할인율: ${d.discountRate}%`);
-              if (d?.mallUrl) lines.push('클릭 시 판매처 이동');
+              if (d?.mall) lines.push('클릭 시 판매처 이동');
               return lines;
             }
           }
@@ -1044,7 +1064,7 @@ function updateChart() {
       onClick: (e, elements) => {
         if (elements.length && elements[0].datasetIndex === 0) {
           const d = data[elements[0].index];
-          if (d?.mallUrl) window.open(d.mallUrl, '_blank');
+          if (d?.mall) window.open(getMallUrl(d.mall, appState.setNumber), '_blank');
         }
       }
     }

@@ -77,8 +77,20 @@
     <div id="error-box" class="bg-red-50 border-2 border-red-200 rounded-xl p-3 text-red-700 font-bold text-xs mt-3 break-all" style="display:none;"></div>
   </section>
 
+  <!-- Wishlist -->
+  <section id="wishlist-section" class="mb-12" style="display:none;">
+    <div class="flex items-center justify-between mb-6 px-4">
+      <h3 class="text-xl font-black text-[#3c4043]">❤️ 나의 위시리스트</h3>
+      <span id="wishlist-count" class="text-xs font-bold text-[#70757a]"></span>
+    </div>
+    <div id="wishlist-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 grid-4"></div>
+  </section>
+
+  <!-- Results -->
+  <div id="results-section"></div>
+
   <!-- Category Browser -->
-  <section id="category-section" class="mb-8" style="display:none;">
+  <section id="category-section" class="mb-8 mt-8" style="display:none;">
     <div class="flex items-center gap-3 mb-4 px-1">
       <span class="text-xl">🧱</span>
       <h3 class="text-lg font-black text-[#3c4043]">카테고리 탐색</h3>
@@ -105,18 +117,6 @@
     <div id="category-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3 grid-4 max-h-[520px] overflow-y-auto scrollbar-hide pr-1"></div>
     <div id="category-count" class="text-xs font-bold text-[#70757a] text-center mt-3"></div>
   </section>
-
-  <!-- Wishlist -->
-  <section id="wishlist-section" class="mb-12" style="display:none;">
-    <div class="flex items-center justify-between mb-6 px-4">
-      <h3 class="text-xl font-black text-[#3c4043]">❤️ 나의 위시리스트</h3>
-      <span id="wishlist-count" class="text-xs font-bold text-[#70757a]"></span>
-    </div>
-    <div id="wishlist-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 grid-4"></div>
-  </section>
-
-  <!-- Results -->
-  <div id="results-section"></div>
 
   <footer class="mt-16 py-10 border-t-2 border-[#dadce0] text-center">
     <p class="text-xs font-bold text-[#70757a] mb-6 max-w-lg mx-auto leading-relaxed">
@@ -496,30 +496,43 @@ window.analyzeLego = async () => {
     : '';
 
   const prompt = `
-        당신은 레고 시장 분석 전문가입니다. 다음 레고 제품에 대한 심층적인 역사적 가격 및 중고 시장 분석을 수행해주세요.
+        당신은 레고 시장 분석 전문가입니다. 다음 레고 제품에 대한 심층적인 가격 분석을 수행해주세요.
 
         제품 번호: ${setNumber}
         사용자가 입력한 현재 가격: ${currentPrice}원
         데이터 간격: ${appState.chartInterval === 'weekly' ? '주차별 (Weekly)' : '월별 (Monthly)'}
         ${knownInfo}
 
+        [반드시 Google Search로 검색해야 할 항목들]
+        Step 1: "레고 ${setNumber} 가격" 또는 "LEGO ${setNumber} 가격" 검색 → 네이버쇼핑, 쿠팡, 11번가, 레고코리아 공식 등의 현재 판매가 확인
+        Step 2: "레고 ${setNumber} 최저가" 검색 → 다나와/에누리/네이버 가격비교에서 역대 최저가 및 가격 히스토리 확인
+        Step 3: "레고 ${setNumber} 중고" 또는 "레고 ${setNumber} MISB" 검색 → 번개장터/당근마켓/레고 커뮤니티 중고 시세 확인
+        Step 4: "LEGO ${setNumber} bricklink" 검색 → BrickLink 가격 가이드 확인
+        Step 5: "LEGO ${setNumber} amazon" 검색 → Amazon 가격 확인
+
         [분석 및 출력 요구사항]
         1. 정가(MSRP), 부품 수(Piece Count)를 확인하세요${si ? ' (위 확정 정보 사용)' : ''}.
-        2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름, 그리고 해당 쇼핑몰의 당시 상품 URL(예상)을 포함하세요.
-        3. 출시 이후부터 현재까지의 ${appState.chartInterval === 'weekly' ? '주차별' : '월별'} 가격 변동 트렌드를 조사하세요. (새상품 기준, historicalData 필드)
-        4. 중고 시장(MISB 기준)의 ${appState.chartInterval === 'weekly' ? '주차별' : '월별'} 가격 변동 트렌드도 함께 조사하세요. (historicalDataUsed 필드)
-        5. 현재 유통 중인 주요 쇼핑몰의 실시간 가격과 정확한 URL을 조사하세요. URL은 해당 레고 세트의 실제 상품 페이지 URL이어야 합니다 (메인 페이지 X, 검색결과 X). Google Search로 "${setNumber} 레고 쿠팡", "${setNumber} 레고 네이버쇼핑" 등으로 검색하여 실제 상품 URL을 찾으세요.
-        6. 중고 시장 시세를 분석하세요:
-           - MISB (Mint In Sealed Box): 미개봉 새제품
-           - MIB (Mint In Box): 박스는 개봉했으나 내부 봉지는 미개봉
-           - Used: 조립 완료 또는 박스 없는 중고
-        7. 이 제품의 단종 예상 시기와 단종 위험도(low, medium, high)를 분석하세요.
-        8. 재테크 지수(0-100)와 해외 가격(Amazon, BrickLink)을 조사하세요.
+        2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요 (Google Search에서 확인된 실제 데이터만).
+        3. 출시 이후부터 현재까지의 ${appState.chartInterval === 'weekly' ? '주차별' : '월별'} 가격 변동 트렌드를 기록하세요 (새상품 기준, historicalData 필드). 다나와/에누리/네이버 가격비교 히스토리를 우선 참조하세요.
+        4. 중고 시장(MISB 기준)의 가격 변동 트렌드도 함께 기록하세요 (historicalDataUsed 필드). 번개장터, 당근, 레고 커뮤니티 실거래가 참조.
+        5. 현재 판매 중인 주요 쇼핑몰 목록과 가격: 네이버쇼핑, 레고코리아 공식, 이마트, 롯데마트, 홈플러스, 롯데온, 쿠팡, 11번가, 토이저러스 등. URL은 제공하지 말고 mall name만 정확히 기재하세요 (프론트엔드에서 자동 생성).
+        6. 중고 시장 시세:
+           - MISB (미개봉 새제품)
+           - MIB (박스 개봉, 내부 봉지 미개봉)
+           - Used (조립 완료 또는 박스 없는 중고)
+        7. 단종 예상 시기와 위험도(low/medium/high).
+        8. 재테크 지수(0-100)와 해외 가격(Amazon USD, BrickLink USD).
 
-        [출력 형식 - JSON]
+        [중요 주의사항]
+        - URL은 절대 생성하지 마세요 (malls 배열의 url 필드는 "" 빈 문자열로)
+        - 가격 데이터는 반드시 Google Search로 조회한 실제 데이터만 사용하세요
+        - 데이터를 찾지 못한 경우 null로 표시하고, 절대 추정값을 실제 데이터처럼 제시하지 마세요
+        - historicalData는 실제 확인된 가격 변동만 포함하세요 (최소 5개, 최대 24개)
+
+        [출력 형식 - JSON만 출력]
         {
           "title": "제품 정식 이름 (한글 포함)",
-          "imageUrl": "https://images.brickset.com/sets/images/XXXXX-1.jpg 형식 또는 공식 이미지 URL",
+          "imageUrl": "https://images.brickset.com/sets/images/${setNumber}-1.jpg",
           "status": "buy",
           "statusText": "...",
           "summary": "...",
@@ -529,7 +542,7 @@ window.analyzeLego = async () => {
           "averagePrice": 110000,
           "lowestPrice": 95000,
           "lowestPriceDate": "2023-11-24",
-          "lowestPriceMall": "...",
+          "lowestPriceMall": "쿠팡",
           "pieceCount": 1500,
           "ppp": 82,
           "usedPrices": { "misb": 130000, "mib": 110000, "used": 85000 },
@@ -538,13 +551,12 @@ window.analyzeLego = async () => {
           "investmentScore": 85,
           "investmentReason": "...",
           "globalPrices": { "amazon": 99.99, "bricklink": 110.00, "currency": "USD" },
-          "malls": [{ "name": "쿠팡", "price": 105000, "discountRate": 15, "url": "https://www.coupang.com/vp/products/실제상품ID", "isLowest": true }],
-          "historicalData": [{ "date": "2023-01-01", "price": 123000, "mall": "...", "mallUrl": "...", "discountRate": 0 }],
-          "historicalDataUsed": [{ "date": "2023-01-01", "price": 115000, "mall": "중고장터", "mallUrl": "", "discountRate": 0 }]
+          "malls": [{ "name": "쿠팡", "price": 105000, "discountRate": 15, "url": "", "isLowest": true }],
+          "historicalData": [{ "date": "2023-01-01", "price": 123000, "mall": "네이버쇼핑", "mallUrl": "", "discountRate": 0 }],
+          "historicalDataUsed": [{ "date": "2023-01-01", "price": 115000, "mall": "번개장터", "mallUrl": "", "discountRate": 0 }]
         }
 
-        반드시 한국어로 답변하고, Google Search를 활용하여 실제 데이터를 최대한 반영하세요.
-        데이터 포인트는 최소 10개 이상 생성하여 그래프가 풍부하게 보이게 하세요.
+        반드시 한국어로 답변하고, Google Search를 단계별로 실행하여 실제 데이터를 최대한 반영하세요.
       `;
 
   try {
@@ -628,14 +640,31 @@ function renderWishlist() {
 // ── CATEGORY BROWSER ──────────────────────────────────────
 const catState = { theme: null, year: null, sub: null };
 
+const WISHLIST_TAB = '❤️ 찜 목록';
+
 function initCategoryBrowser() {
   if (typeof LEGO_THEMES === 'undefined' || typeof LEGO_DB === 'undefined') return;
   document.getElementById('category-section').style.display = 'block';
-  const themes = LEGO_THEMES.slice(0, 24);
-  catState.theme = themes[0];
-  const pillsEl = document.getElementById('theme-pills');
-  pillsEl.innerHTML = themes.map(t => themePill(t, t === catState.theme)).join('');
+  catState.theme = LEGO_THEMES[0];
+  renderThemePills();
   applyCategoryFilters();
+}
+
+function renderThemePills() {
+  const themes = LEGO_THEMES.slice(0, 24);
+  const pillsEl = document.getElementById('theme-pills');
+  // 찜 탭은 항상 맨 앞
+  pillsEl.innerHTML =
+    wishlistPill(catState.theme === WISHLIST_TAB) +
+    themes.map(t => themePill(t, t === catState.theme)).join('');
+}
+
+function wishlistPill(active) {
+  return `<button id="tpill-wishlist" onclick="selectTheme('${WISHLIST_TAB}')"
+    style="flex-shrink:0;padding:7px 16px;border-radius:9999px;border:2px solid ${active?'#e53935':'#fca5a5'};
+    background:${active?'#e53935':'#fff1f2'};color:${active?'white':'#e53935'};
+    font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap;transition:all 0.15s;font-family:inherit;">
+    ❤️ 찜 목록</button>`;
 }
 
 function themePill(t, active) {
@@ -656,11 +685,8 @@ function yearPill(y, active) {
 }
 
 window.selectTheme = (theme) => {
-  const prev = document.getElementById('tpill-' + encodeURIComponent(catState.theme));
-  if (prev) { prev.style.background='white'; prev.style.color='#3c4043'; prev.style.borderColor='#dadce0'; }
   catState.theme = theme; catState.year = null; catState.sub = null;
-  const cur = document.getElementById('tpill-' + encodeURIComponent(theme));
-  if (cur) { cur.style.background='#e53935'; cur.style.color='white'; cur.style.borderColor='#e53935'; }
+  renderThemePills();
   renderYearPills();
   renderSubPills();
   applyCategoryFilters();
@@ -706,6 +732,50 @@ window.selectSub = (s) => {
 };
 
 window.applyCategoryFilters = () => {
+  const isWishlist = catState.theme === WISHLIST_TAB;
+  // 연도/정렬 필터 바 표시 여부
+  document.getElementById('year-pills').parentElement.style.display = isWishlist ? 'none' : 'flex';
+
+  const grid = document.getElementById('category-grid');
+
+  if (isWishlist) {
+    // 찜 목록 모드
+    const wl = appState.wishlist || [];
+    if (!appState.user) {
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#70757a;font-weight:700;">
+        로그인 후 찜 목록을 사용할 수 있어요 🔑</div>`;
+      document.getElementById('category-count').textContent = '';
+      return;
+    }
+    if (wl.length === 0) {
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#70757a;font-weight:700;">
+        아직 찜한 제품이 없어요 ❤️</div>`;
+      document.getElementById('category-count').textContent = '0개';
+      return;
+    }
+    grid.innerHTML = wl.map(item => {
+      const dbInfo = LEGO_DB[item.number];
+      const name = item.name || (dbInfo ? dbInfo[0] : `LEGO ${item.number}`);
+      const img = item.image || `https://images.brickset.com/sets/images/${item.number}-1.jpg`;
+      return `
+        <div style="background:white;border:2px solid #fca5a5;border-radius:16px;padding:12px;position:relative;text-align:left;">
+          <button onclick="window._toggleWishlist('${item.number}','${name.replace(/'/g,"\\'")}','${img}')"
+            style="position:absolute;top:8px;right:8px;width:26px;height:26px;background:#fff1f2;border-radius:50%;border:none;cursor:pointer;font-size:13px;z-index:1;">❤️</button>
+          <div onclick="selectSetFromCategory('${item.number}')" style="cursor:pointer;">
+            <div style="aspect-ratio:1;background:#f8f9fa;border-radius:10px;overflow:hidden;margin-bottom:8px;">
+              <img src="${img}" style="width:100%;height:100%;object-fit:contain;padding:6px;" loading="lazy" onerror="this.style.display='none'">
+            </div>
+            <div style="font-size:11px;font-weight:900;color:#e53935;margin-bottom:2px;">${item.number}</div>
+            <div style="font-size:12px;font-weight:700;color:#3c4043;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.4;">${name}</div>
+            ${dbInfo ? `<div style="font-size:10px;font-weight:700;color:#9aa0a6;margin-top:4px;">${dbInfo[1]} · ${dbInfo[2].toLocaleString()}pcs</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+    document.getElementById('category-count').textContent = `${wl.length}개`;
+    return;
+  }
+
+  // 일반 카테고리 모드
   const sort = document.getElementById('cat-sort')?.value || 'year-desc';
   let sets = Object.entries(LEGO_DB).filter(([, v]) => v[3] === catState.theme);
   if (catState.year !== null) sets = sets.filter(([, v]) => v[1] === catState.year);
@@ -716,21 +786,27 @@ window.applyCategoryFilters = () => {
     if (sort === 'pieces-desc') return b[2]-a[2];
     return a[2]-b[2];
   });
-  const grid = document.getElementById('category-grid');
-  grid.innerHTML = sets.map(([num, info]) => `
-    <button onclick="selectSetFromCategory('${num}')"
-      style="background:white;border:2px solid #dadce0;border-radius:16px;padding:12px;cursor:pointer;text-align:left;transition:all 0.15s;font-family:inherit;"
+  grid.innerHTML = sets.map(([num, info]) => {
+    const inWL = (appState.wishlist||[]).some(i => i.number === num);
+    return `
+    <div style="background:white;border:2px solid #dadce0;border-radius:16px;padding:12px;position:relative;transition:all 0.15s;"
       onmouseover="this.style.borderColor='#e53935';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(229,57,53,0.15)'"
       onmouseout="this.style.borderColor='#dadce0';this.style.transform='';this.style.boxShadow=''">
-      <div style="aspect-ratio:1;background:#f8f9fa;border-radius:10px;overflow:hidden;margin-bottom:8px;">
-        <img src="https://images.brickset.com/sets/images/${num}-1.jpg"
-          style="width:100%;height:100%;object-fit:contain;padding:6px;" loading="lazy"
-          onerror="this.style.display='none'">
+      <button onclick="event.stopPropagation();window._toggleWishlist('${num}','${info[0].replace(/'/g,"\\'")}','https://images.brickset.com/sets/images/${num}-1.jpg')"
+        title="${inWL?'찜 해제':'찜하기'}"
+        style="position:absolute;top:8px;right:8px;width:26px;height:26px;background:${inWL?'#fff1f2':'rgba(255,255,255,0.9)'};border-radius:50%;border:1px solid ${inWL?'#fca5a5':'#dadce0'};cursor:pointer;font-size:13px;z-index:1;transition:all 0.15s;">${inWL?'❤️':'🤍'}</button>
+      <div onclick="selectSetFromCategory('${num}')" style="cursor:pointer;">
+        <div style="aspect-ratio:1;background:#f8f9fa;border-radius:10px;overflow:hidden;margin-bottom:8px;">
+          <img src="https://images.brickset.com/sets/images/${num}-1.jpg"
+            style="width:100%;height:100%;object-fit:contain;padding:6px;" loading="lazy"
+            onerror="this.style.display='none'">
+        </div>
+        <div style="font-size:11px;font-weight:900;color:#e53935;margin-bottom:2px;">${num}</div>
+        <div style="font-size:12px;font-weight:700;color:#3c4043;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.4;">${info[0]}</div>
+        <div style="font-size:10px;font-weight:700;color:#9aa0a6;margin-top:4px;">${info[1]} · ${info[2].toLocaleString()}pcs</div>
       </div>
-      <div style="font-size:11px;font-weight:900;color:#e53935;margin-bottom:2px;">${num}</div>
-      <div style="font-size:12px;font-weight:700;color:#3c4043;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.4;">${info[0]}</div>
-      <div style="font-size:10px;font-weight:700;color:#9aa0a6;margin-top:4px;">${info[1]} · ${info[2].toLocaleString()}pcs</div>
-    </button>`).join('');
+    </div>`;
+  }).join('');
   document.getElementById('category-count').textContent = `${sets.length}개 세트`;
 };
 

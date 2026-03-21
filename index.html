@@ -438,6 +438,8 @@ window.analyzeLego = async () => {
   showError(null);
   document.getElementById('results-section').innerHTML = '';
   setAnalyzeBtn(true, '제품 정보 조회 중...');
+  // sets-data.json 아직 로드 중이면 기다리기
+  if (legoSetsMap === null) await loadSetsData();
   appState.setInfo = await lookupSetInfo(setNumber);
   setAnalyzeBtn(true);
 

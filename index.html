@@ -48,21 +48,6 @@
 
 <main style="max-width:896px; margin:0 auto; padding:40px 16px;">
 
-  <!-- API Key Setup -->
-  <div id="apikey-section" style="display:none; background:white; border:2px solid #e53935; border-radius:24px; padding:24px; margin-bottom:24px;">
-    <div style="font-size:14px; font-weight:900; color:#3c4043; margin-bottom:12px;">🔑 Gemini API 키 설정</div>
-    <div style="display:flex; gap:12px; flex-wrap:wrap;">
-      <input id="apikey-input" type="password" placeholder="Gemini API 키를 입력하세요 (AIza...)"
-        style="flex:1; min-width:200px; padding:12px 16px; border:2px solid #dadce0; border-radius:12px; font-size:14px; font-weight:700; outline:none;"
-        onfocus="this.style.borderColor='#e53935'" onblur="this.style.borderColor='#dadce0'"
-        onkeydown="if(event.key==='Enter')saveApiKey()">
-      <button onclick="saveApiKey()" style="background:#e53935; color:white; padding:12px 20px; border-radius:12px; font-weight:900; font-size:14px; border:none; cursor:pointer; white-space:nowrap;" onmouseover="this.style.background='#d32f2f'" onmouseout="this.style.background='#e53935'">저장</button>
-    </div>
-    <div style="font-size:11px; color:#70757a; margin-top:8px;">
-      <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#42a5f5;">Google AI Studio</a>에서 발급받은 API 키를 입력하세요. 키는 이 브라우저에만 저장됩니다.
-    </div>
-  </div>
-
   <!-- Search Section -->
   <section style="background:rgba(255,255,255,0.85); border-radius:32px; border:2px solid #dadce0; padding:32px; margin-bottom:32px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
     <div class="search-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px;">
@@ -120,6 +105,35 @@
     </div>
   </footer>
 </main>
+
+<!-- ⚙️ API Key Button (fixed bottom-right) -->
+<button onclick="toggleKeyPopup()" id="keyBtn"
+  style="position:fixed; bottom:20px; right:20px; z-index:50; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.85); border:2px solid #dadce0; cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.15); transition:all 0.2s;"
+  onmouseover="this.style.background='white'; this.style.borderColor='#e53935';"
+  onmouseout="this.style.background='rgba(255,255,255,0.85)'; this.style.borderColor='#dadce0';"
+  title="API Key 설정">⚙️</button>
+
+<!-- Key Popup Panel -->
+<div id="keyPopup" style="display:none; position:fixed; bottom:70px; right:20px; z-index:51; background:white; border:2px solid #dadce0; border-radius:20px; padding:20px; width:300px; box-shadow:0 8px 32px rgba(0,0,0,0.15); max-height:calc(100vh - 90px); overflow-y:auto;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <span style="font-size:14px; font-weight:900; color:#3c4043;">🔑 API Key 설정</span>
+    <button onclick="toggleKeyPopup()" style="background:none; border:none; cursor:pointer; font-size:18px; color:#70757a; padding:2px 6px;" onmouseover="this.style.color='#e53935'" onmouseout="this.style.color='#70757a'">✕</button>
+  </div>
+  <div style="margin-bottom:12px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <span style="font-size:12px; font-weight:700; color:#70757a;">Gemini Keys <span id="geminiKeyCount" style="color:#42a5f5;"></span></span>
+      <a href="https://aistudio.google.com/apikey" target="_blank" style="font-size:11px; color:#42a5f5; text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">발급 →</a>
+    </div>
+    <div id="geminiKeysList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;"></div>
+    <button onclick="addGeminiKeyRow()" id="addKeyBtn"
+      style="width:100%; padding:8px; border-radius:12px; border:2px dashed #dadce0; background:transparent; cursor:pointer; font-size:12px; font-weight:700; color:#70757a; transition:all 0.15s; font-family:inherit;"
+      onmouseover="this.style.borderColor='#e53935'; this.style.color='#e53935';"
+      onmouseout="this.style.borderColor='#dadce0'; this.style.color='#70757a';">+ 키 추가 (최대 4개)</button>
+  </div>
+  <div style="font-size:10px; color:#9aa0a6; line-height:1.5; border-top:1px solid #f1f3f4; padding-top:10px;">
+    키가 여러 개면 한도 초과 시 자동으로 다음 키로 전환됩니다.
+  </div>
+</div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
@@ -360,15 +374,111 @@ window.handleInputKey = (e) => {
   if (e.key === 'Escape') showSuggestions(false);
 };
 
-// ── API KEY ─────────────────────────────────────────────
-function getApiKey() { return localStorage.getItem('lego_gemini_key') || ''; }
+// ── API KEY (멀티키) ─────────────────────────────────────
+let exhaustedKeys = new Set();
+let invalidKeys = new Set();
 
-window.saveApiKey = () => {
-  const key = (document.getElementById('apikey-input').value || '').trim();
-  if (!key) { showError('API 키를 입력해주세요.'); return; }
-  localStorage.setItem('lego_gemini_key', key);
-  document.getElementById('apikey-section').style.display = 'none';
-  showError('');
+function getGeminiKeys() {
+  return JSON.parse(localStorage.getItem('lego_gemini_keys') || '[]');
+}
+function saveGeminiKeys(keys) {
+  localStorage.setItem('lego_gemini_keys', JSON.stringify(keys));
+}
+function getActiveKey() {
+  return getGeminiKeys().find(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)) || null;
+}
+function markKeyExhausted(key) {
+  exhaustedKeys.add(key);
+  const remaining = getGeminiKeys().filter(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)).length;
+  showError(remaining > 0
+    ? `키 한도 초과 → 다음 키로 전환 (${remaining}개 남음). 다시 분석해주세요.`
+    : '모든 키가 한도 초과됐습니다. 잠시 후 다시 시도하세요.');
+  renderGeminiKeysList();
+}
+function markKeyInvalid(key) {
+  invalidKeys.add(key);
+  const remaining = getGeminiKeys().filter(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)).length;
+  showError(remaining > 0
+    ? `키 오류 → 다음 키로 전환 (${remaining}개 남음). 다시 분석해주세요.`
+    : '유효한 키가 없습니다. ⚙️에서 키를 확인해주세요.');
+  renderGeminiKeysList();
+}
+
+window.addGeminiKeyRow = (existingVal = '') => {
+  const container = document.getElementById('geminiKeysList');
+  if (!container) return;
+  if (container.children.length >= 4) {
+    showError('최대 4개까지 등록 가능합니다.');
+    return;
+  }
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex; gap:8px; align-items:center;';
+  div.innerHTML = `
+    <div style="position:relative; flex:1;">
+      <input type="password" placeholder="AIza..." value="${existingVal}"
+        style="width:100%; padding:10px 36px 10px 12px; border:2px solid #dadce0; border-radius:12px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; font-family:inherit; transition:border-color 0.15s;"
+        onfocus="this.style.borderColor='#e53935'" onblur="this.style.borderColor='#dadce0'"
+        class="gemini-key-input">
+      <span class="key-status" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px;"></span>
+    </div>
+    <button onclick="this.closest('[data-keyrow]').remove(); saveGeminiKeysFromUI(); updateAddKeyBtn();"
+      style="background:none; border:none; cursor:pointer; color:#f87171; font-size:16px; flex-shrink:0; padding:4px;"
+      onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#f87171'">✕</button>`;
+  div.setAttribute('data-keyrow', '1');
+  div.querySelector('input').addEventListener('input', () => { saveGeminiKeysFromUI(); updateKeyRowStatus(div); });
+  container.appendChild(div);
+  updateKeyRowStatus(div);
+  updateAddKeyBtn();
+};
+
+function updateKeyRowStatus(div) {
+  const input = div.querySelector('input');
+  const statusEl = div.querySelector('.key-status');
+  if (!statusEl || !input) return;
+  const val = input.value.trim();
+  if (!val) { statusEl.textContent = ''; return; }
+  if (invalidKeys.has(val)) { statusEl.textContent = '❌'; statusEl.title = '유효하지 않은 키'; }
+  else if (exhaustedKeys.has(val)) { statusEl.textContent = '⚠️'; statusEl.title = '한도 초과'; input.style.opacity = '0.5'; }
+  else { statusEl.textContent = '✅'; statusEl.title = '유효'; input.style.opacity = '1'; }
+}
+
+function saveGeminiKeysFromUI() {
+  const keys = [...document.querySelectorAll('.gemini-key-input')]
+    .map(i => i.value.trim()).filter(k => k.length > 6);
+  saveGeminiKeys(keys);
+  updateGeminiKeyCount();
+}
+
+function updateGeminiKeyCount() {
+  const el = document.getElementById('geminiKeyCount');
+  const n = getGeminiKeys().length;
+  if (el) el.textContent = n > 0 ? `(${n}개 등록됨)` : '';
+}
+
+function updateAddKeyBtn() {
+  const btn = document.getElementById('addKeyBtn');
+  const container = document.getElementById('geminiKeysList');
+  if (!btn || !container) return;
+  btn.style.display = container.children.length >= 4 ? 'none' : 'block';
+}
+
+function renderGeminiKeysList() {
+  const container = document.getElementById('geminiKeysList');
+  if (!container) return;
+  container.innerHTML = '';
+  const keys = getGeminiKeys();
+  keys.forEach(k => addGeminiKeyRow(k));
+  if (keys.length === 0) addGeminiKeyRow();
+  updateGeminiKeyCount();
+  updateAddKeyBtn();
+}
+
+window.toggleKeyPopup = () => {
+  const popup = document.getElementById('keyPopup');
+  if (!popup) return;
+  const isHidden = popup.style.display === 'none';
+  popup.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) renderGeminiKeysList();
 };
 
 // ── ANALYZE ─────────────────────────────────────────────
@@ -378,7 +488,7 @@ window.analyzeLego = async (overrideInterval) => {
   showError('');
 
   if (!setNumber || !currentPrice) { showError('제품 번호와 현재 가격을 모두 입력해주세요.'); return; }
-  if (!getApiKey()) { document.getElementById('apikey-section').style.display = 'block'; showError('Gemini API 키를 먼저 설정해주세요.'); return; }
+  if (!getActiveKey()) { toggleKeyPopup(); showError('⚙️ Gemini API 키를 먼저 설정해주세요.'); return; }
 
   const interval = overrideInterval || appState.chartInterval;
   appState.setNumber = setNumber;
@@ -436,9 +546,10 @@ window.analyzeLego = async (overrideInterval) => {
   "historicalDataUsed": [{ "date": "2023-01-01", "price": 115000, "mall": "중고장터", "mallUrl": "", "discountRate": 0 }]
 }`;
 
+  const activeKey = getActiveKey();
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${getApiKey()}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${activeKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -453,9 +564,13 @@ window.analyzeLego = async (overrideInterval) => {
     if (!res.ok) {
       const errJson = await res.json().catch(() => ({}));
       const msg = errJson?.error?.message || `HTTP ${res.status}`;
-      if (res.status === 400 && msg.includes('API_KEY')) {
-        localStorage.removeItem('lego_gemini_key');
-        document.getElementById('apikey-section').style.display = 'block';
+      if (res.status === 429 || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+        markKeyExhausted(activeKey);
+        return;
+      }
+      if (res.status === 400 && (msg.includes('API_KEY') || msg.includes('API key'))) {
+        markKeyInvalid(activeKey);
+        return;
       }
       throw new Error(msg);
     }
@@ -956,12 +1071,20 @@ function showError(msg) {
 }
 
 // ── INIT ────────────────────────────────────────────────
-if (!getApiKey()) {
-  document.getElementById('apikey-section').style.display = 'block';
+// Auto-open key popup if no keys set
+if (getGeminiKeys().length === 0) {
+  setTimeout(() => toggleKeyPopup(), 400);
 }
 
-// Close suggestions on outside click
+// Close popups / suggestions on outside click
 document.addEventListener('click', (e) => {
+  // Key popup
+  const popup = document.getElementById('keyPopup');
+  const btn = document.getElementById('keyBtn');
+  if (popup && btn && popup.style.display !== 'none' && !popup.contains(e.target) && !btn.contains(e.target)) {
+    popup.style.display = 'none';
+  }
+  // Autocomplete suggestions
   if (!e.target.closest('#set-number-input') && !e.target.closest('#suggestions-dropdown')) {
     showSuggestions(false);
   }

@@ -47,37 +47,33 @@
 
 <main class="max-w-4xl mx-auto px-4 py-10">
 
-  <!-- Search Section -->
-  <section class="bg-white/80 backdrop-blur-sm rounded-[2rem] border-2 border-[#dadce0] p-8 mb-8 shadow-sm">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 grid-2">
-      <div>
-        <label class="block text-xs font-black text-[#70757a] uppercase mb-2 ml-4 tracking-wider">제품 번호</label>
-        <div class="relative">
-          <span class="absolute inset-y-0 left-5 flex items-center pointer-events-none text-[#e53935]">🔍</span>
-          <input id="set-number-input" type="text" placeholder="예: 10316" autocomplete="off"
-            class="w-full pl-12 pr-6 py-4 bg-[#f8f9fa] border-2 border-[#dadce0] rounded-2xl focus:outline-none focus:border-[#e53935] transition-all text-lg font-bold"
-            oninput="onSetInput(this.value)"
-            onfocus="if(appState.suggestions.length>0)showSugg(true);"
-            onblur="setTimeout(()=>showSugg(false),200);"
-            onkeydown="handleKey(event)">
-          <div id="suggestions-dropdown" class="absolute top-full left-0 right-0 mt-3 bg-white border-2 border-[#dadce0] rounded-2xl shadow-xl z-[60] overflow-hidden max-h-80 overflow-y-auto scrollbar-hide" style="display:none;"></div>
-        </div>
+  <!-- Search Section (compact) -->
+  <section class="bg-white/80 backdrop-blur-sm rounded-2xl border-2 border-[#dadce0] px-5 py-4 mb-6 shadow-sm">
+    <div class="text-[10px] font-black text-[#70757a] uppercase tracking-widest mb-3">직접 입력 (구형 제품)</div>
+    <div class="flex gap-3 items-start">
+      <div class="relative flex-1">
+        <span class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-[#e53935] text-sm">🔍</span>
+        <input id="set-number-input" type="text" placeholder="제품 번호 (예: 10316)" autocomplete="off"
+          class="w-full pl-10 pr-4 py-2.5 bg-[#f8f9fa] border-2 border-[#dadce0] rounded-xl focus:outline-none focus:border-[#e53935] transition-all text-sm font-bold"
+          oninput="onSetInput(this.value)"
+          onfocus="if(appState.suggestions.length>0)showSugg(true);"
+          onblur="setTimeout(()=>showSugg(false),200);"
+          onkeydown="handleKey(event)">
+        <div id="suggestions-dropdown" class="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-[#dadce0] rounded-2xl shadow-xl z-[60] overflow-hidden max-h-72 overflow-y-auto scrollbar-hide" style="display:none;"></div>
       </div>
-      <div>
-        <label class="block text-xs font-black text-[#70757a] uppercase mb-2 ml-4 tracking-wider">현재 판매가</label>
-        <div class="relative">
-          <span class="absolute inset-y-0 left-5 flex items-center pointer-events-none">📉</span>
-          <input id="price-input" type="number" placeholder="원 단위 입력"
-            class="w-full pl-12 pr-6 py-4 bg-[#f8f9fa] border-2 border-[#dadce0] rounded-2xl focus:outline-none focus:border-[#42a5f5] transition-all text-lg font-bold"
-            oninput="appState.currentPrice = this.value">
-        </div>
+      <div class="relative flex-1">
+        <span class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-sm">💰</span>
+        <input id="price-input" type="number" placeholder="현재 판매가 (원)"
+          class="w-full pl-10 pr-4 py-2.5 bg-[#f8f9fa] border-2 border-[#dadce0] rounded-xl focus:outline-none focus:border-[#42a5f5] transition-all text-sm font-bold"
+          oninput="appState.currentPrice = this.value"
+          onkeydown="if(event.key==='Enter') analyzeLego()">
       </div>
+      <button id="analyze-btn" onclick="analyzeLego()"
+        class="flex-shrink-0 bg-[#e53935] hover:bg-[#d32f2f] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black px-5 py-2.5 rounded-xl transition-all text-sm shadow-sm">
+        분석
+      </button>
     </div>
-    <div id="error-box" class="bg-red-50 border-2 border-red-200 rounded-2xl p-4 text-red-700 font-bold text-sm mb-6 break-all" style="display:none;"></div>
-    <button id="analyze-btn" onclick="analyzeLego()"
-      class="w-full bg-[#e53935] hover:bg-[#d32f2f] disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-5 rounded-2xl transition-all flex items-center justify-center gap-3 text-xl shadow-md active:shadow-none active:translate-y-[2px]">
-      🔍 분석 시작하기
-    </button>
+    <div id="error-box" class="bg-red-50 border-2 border-red-200 rounded-xl p-3 text-red-700 font-bold text-xs mt-3 break-all" style="display:none;"></div>
   </section>
 
   <!-- Category Browser -->
@@ -132,6 +128,35 @@
     </div>
   </footer>
 </main>
+
+<!-- Quick Analyze Floating Bar -->
+<div id="quick-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:300;
+  background:white;border-top:2px solid #e53935;box-shadow:0 -4px 24px rgba(0,0,0,0.15);
+  padding:16px;transform:translateY(100%);transition:transform 0.25s ease;">
+  <div style="max-width:896px;margin:0 auto;display:flex;align-items:center;gap:12px;">
+    <div id="qbar-img" style="width:52px;height:52px;background:#f8f9fa;border-radius:10px;overflow:hidden;flex-shrink:0;border:1px solid #dadce0;">
+      <img id="qbar-img-el" style="width:100%;height:100%;object-fit:contain;padding:4px;" onerror="this.style.display='none'">
+    </div>
+    <div style="flex:1;min-width:0;">
+      <div id="qbar-name" style="font-size:13px;font-weight:900;color:#3c4043;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"></div>
+      <div id="qbar-num" style="font-size:11px;font-weight:700;color:#e53935;"></div>
+    </div>
+    <div style="position:relative;flex-shrink:0;">
+      <span style="position:absolute;inset-y:0;left:12px;display:flex;align-items:center;font-size:13px;">💰</span>
+      <input id="qbar-price" type="number" placeholder="현재 판매가 (원)"
+        style="padding:10px 12px 10px 34px;border:2px solid #dadce0;border-radius:12px;font-size:13px;font-weight:700;outline:none;width:180px;font-family:inherit;"
+        onfocus="this.style.borderColor='#42a5f5'"
+        onblur="this.style.borderColor='#dadce0'"
+        onkeydown="if(event.key==='Enter') runQuickAnalyze()">
+    </div>
+    <button onclick="runQuickAnalyze()"
+      style="flex-shrink:0;background:#e53935;color:white;border:none;border-radius:12px;padding:10px 20px;font-size:14px;font-weight:900;cursor:pointer;font-family:inherit;white-space:nowrap;">
+      🔍 분석
+    </button>
+    <button onclick="closeQuickBar()"
+      style="flex-shrink:0;background:none;border:none;color:#70757a;cursor:pointer;font-size:20px;padding:4px;">✕</button>
+  </div>
+</div>
 
 <!-- Settings Button -->
 <button onclick="toggleSettings()" id="settings-btn"
@@ -706,6 +731,40 @@ window.applyCategoryFilters = () => {
       <div style="font-size:10px;font-weight:700;color:#9aa0a6;margin-top:4px;">${info[1]} · ${info[2].toLocaleString()}pcs</div>
     </button>`).join('');
   document.getElementById('category-count').textContent = `${sets.length}개 세트`;
+};
+
+window.selectSetFromCategory = (num) => {
+  const info = LEGO_DB[num];
+  // 메인 입력창에도 채워두기 (구형 직접입력과 연동)
+  document.getElementById('set-number-input').value = num;
+  appState.setNumber = num;
+  showSugg(false);
+  // 플로팅 바 띄우기
+  document.getElementById('qbar-img-el').src = `https://images.brickset.com/sets/images/${num}-1.jpg`;
+  document.getElementById('qbar-name').textContent = info ? info[0] : `LEGO ${num}`;
+  document.getElementById('qbar-num').textContent = `SET #${num}${info ? ' · ' + info[1] + ' · ' + info[2].toLocaleString() + 'pcs' : ''}`;
+  document.getElementById('qbar-price').value = '';
+  document.getElementById('qbar-price').placeholder = '현재 판매가 (원)';
+  const bar = document.getElementById('quick-bar');
+  bar.style.display = 'block';
+  requestAnimationFrame(() => { bar.style.transform = 'translateY(0)'; });
+  setTimeout(() => document.getElementById('qbar-price').focus(), 300);
+};
+
+window.runQuickAnalyze = () => {
+  const price = document.getElementById('qbar-price').value.trim();
+  if (!price) { document.getElementById('qbar-price').style.borderColor='#e53935'; document.getElementById('qbar-price').focus(); return; }
+  appState.currentPrice = price;
+  document.getElementById('price-input').value = price;
+  closeQuickBar();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  analyzeLego();
+};
+
+window.closeQuickBar = () => {
+  const bar = document.getElementById('quick-bar');
+  bar.style.transform = 'translateY(100%)';
+  setTimeout(() => { bar.style.display = 'none'; }, 250);
 };
 
 // ── SUGGESTIONS ──────────────────────────────────────────
@@ -1293,11 +1352,7 @@ function showError(msg) {
 
 function setAnalyzeBtn(loading, label) {
   const btn = document.getElementById('analyze-btn');
-  if (!btn) return;
-  btn.disabled = loading;
-  btn.innerHTML = loading
-    ? `<span class="spin">⟳</span>&nbsp; ${label || '분석 중... (15~30초 소요)'}`
-    : '🔍 분석 시작하기';
+  if (btn) { btn.disabled = loading; btn.textContent = loading ? (label || '분석 중...') : '분석'; }
 }
 
 // ── CLICK OUTSIDE ─────────────────────────────────────────

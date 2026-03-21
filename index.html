@@ -566,6 +566,8 @@ window.analyzeLego = async (overrideInterval) => {
 
   const prompt = `당신은 레고 시장 분석 전문가입니다. 다음 레고 제품에 대한 심층적인 역사적 가격 및 중고 시장 분석을 수행해주세요.
 
+⚠️ 중요: 반드시 제품 번호 ${setNumber}번 레고 세트만 분석하세요. 다른 제품번호의 데이터를 반환하면 안 됩니다. title 필드에는 반드시 ${setNumber}번 제품의 실제 이름을 넣으세요.
+
 제품 번호: ${setNumber}
 사용자가 입력한 현재 가격: ${currentPrice}원
 데이터 간격: ${interval === 'weekly' ? '최근 6개월간 매주(Weekly) 단위' : '출시 이후 매월(Monthly) 단위'}

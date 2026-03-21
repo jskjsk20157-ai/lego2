@@ -42,7 +42,6 @@
           <div class="text-[10px] font-bold text-white/70 uppercase tracking-[0.2em]">SMART BRICK ADVISOR</div>
         </div>
       </button>
-    <div id="auth-section"></div>
   </div>
 </header>
 
@@ -197,62 +196,28 @@ window.LEGO_THEMES=["City","Friends","Ninjago","Star Wars","Super Heroes Marvel"
 window.LEGO_TREE={"Creator":["Creator 3-in-1","Creator Expert"],"Seasonal":["Advent","Chinese (Lunar) New Year","Christmas","City","Creator","Disney","Easter","Friends","Halloween","Harry Potter","Marvel","Star Wars","Thanksgiving","Valentine"],"Duplo":["Basic Set","Bluey","Cars","DC Comics","Disney Princess","Jurassic World","Marvel","Mickey & Friends","Peppa Pig","Playhouse","Seasonal","Town","Toy Story","Trains","Winnie the Pooh"],"Disney":["Disney Princess","Frozen","Mickey Mouse","Pirates of the Caribbean"],"Super Heroes Marvel":["Avengers","Captain America","Guardians of the Galaxy","Spider-Man","Spidey and His Amazing Friends","The Infinity Saga","X-Men"],"Educational and Dacta":["Duplo and Explore","Learning at Home","SPIKE","Serious Play","Supplemental"],"Architecture":["Skylines"],"Super Heroes DC":["Batman","Superman","UCS"],"City":["Airport","Arctic","Cargo","Coast Guard","Construction","Farm","Fire","Harbor","Hospital","Jungle","Off-Road","Police","Space","Stuntz","Traffic","Trains"],"Star Wars":["Ultimate Collector Series"],"Promotional":["Bricktober","VIP Add-On Packs"],"Other":["Database Sets"],"Books":["Activity Books with LEGO Parts","Ideas Books","Story Books","Technic"],"Collectible Minifigures":["DC Super Heroes","Dungeons & Dragons","Formula 1","Harry Potter and Fantastic Beasts Series 2","Looney Tunes","Marvel Series 1","Marvel Series 2","Series 20 Minifigures","Series 21 Minifigures","Series 22 Minifigures","Series 23 Minifigures","Series 24 Minifigures","Series 25 Minifigures","Series 26 Minifigures","Series 27 Minifigures","Spider-Man - Across the Spider-Verse","The Muppets"],"LEGO Brand Store":["Monthly Mini Model Build"],"Gear":["Key Chain","Magnets","Stationery and Office Supplies","Storage","Tabletop Games and Puzzles"]};
 </script>
 <script type="module">
-// ── FIREBASE ─────────────────────────────────────────────
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-  from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getFirestore, collection, query, where, onSnapshot, addDoc, deleteDoc, doc }
-  from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+// ── WISHLIST (localStorage) ──────────────────────────────
+function loadWishlist() {
+  try { return JSON.parse(localStorage.getItem('lego_wishlist') || '[]'); } catch { return []; }
+}
+function saveWishlist(wl) {
+  localStorage.setItem('lego_wishlist', JSON.stringify(wl));
+}
 
-const FB = {
-  apiKey: "AIzaSyAlV9WyJWzhwMYPdzFSJxYXt2kTnU1Lue0",
-  authDomain: "gen-lang-client-0075620344.firebaseapp.com",
-  projectId: "gen-lang-client-0075620344",
-  storageBucket: "gen-lang-client-0075620344.firebasestorage.app",
-  messagingSenderId: "756762936052",
-  appId: "1:756762936052:web:2df970ddcebcc5b492d4a1"
-};
-const DB_ID = "ai-studio-5d22915e-e31d-431e-b888-d03587c84340";
+appState.wishlist = loadWishlist();
 
-const app = initializeApp(FB);
-const auth = getAuth(app);
-const db = getFirestore(app, DB_ID);
-const gProvider = new GoogleAuthProvider();
-
-let wishlistUnsub = null;
-
-onAuthStateChanged(auth, (user) => {
-  appState.user = user;
-  renderAuth();
-  if (user) {
-    if (wishlistUnsub) wishlistUnsub();
-    const q = query(collection(db, 'wishlists'), where('uid', '==', user.uid));
-    wishlistUnsub = onSnapshot(q, (snap) => {
-      appState.wishlist = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      renderWishlist();
-    });
+window._toggleWishlist = (number, name, image) => {
+  const wl = appState.wishlist;
+  const idx = wl.findIndex(i => i.number === number);
+  if (idx >= 0) {
+    wl.splice(idx, 1);
   } else {
-    if (wishlistUnsub) { wishlistUnsub(); wishlistUnsub = null; }
-    appState.wishlist = [];
-    renderWishlist();
+    wl.push({ number, name, image, addedAt: new Date().toISOString() });
   }
-});
-
-window._login = async () => {
-  try { await signInWithPopup(auth, gProvider); }
-  catch (e) { showError('로그인 오류: ' + e.message); }
-};
-window._logout = async () => {
-  try { await signOut(auth); } catch (e) {}
-};
-window._toggleWishlist = async (number, name, image) => {
-  if (!appState.user) { showError('위시리스트를 사용하려면 로그인이 필요합니다.'); return; }
-  const exists = appState.wishlist.find(i => i.number === number);
-  if (exists && exists.id) {
-    await deleteDoc(doc(db, 'wishlists', exists.id));
-  } else {
-    await addDoc(collection(db, 'wishlists'), { number, name, image, addedAt: new Date().toISOString(), uid: appState.user.uid });
-  }
+  saveWishlist(wl);
+  renderWishlist();
+  // 찜 탭 보고 있으면 즉시 갱신
+  if (catState.theme === WISHLIST_TAB) applyCategoryFilters();
 };
 
 // ── CONSTANTS ────────────────────────────────────────────
@@ -309,7 +274,7 @@ window.appState = {
   period: 'all', chartInterval: 'monthly',
   suggestions: [], activeTab: 'new', usedCategory: 'misb',
   isAlertSet: false, showLowestTooltip: false,
-  user: null, wishlist: [], chart: null,
+  wishlist: [], chart: null,
 };
 
 // ── API KEY MANAGEMENT ───────────────────────────────────
@@ -495,69 +460,56 @@ window.analyzeLego = async () => {
     ? `\n[확정된 제품 기본 정보 - 아래 값을 그대로 사용하고 다시 검색하지 마세요]\n제품명: ${si.name}\n부품 수: ${si.numParts || '?'}개\n출시 연도: ${si.year || '?'}년${si.msrpKR ? `\n한국 정가: ₩${si.msrpKR.toLocaleString()}` : ''}`
     : '';
 
-  const prompt = `
-        당신은 레고 시장 분석 전문가입니다. 다음 레고 제품에 대한 심층적인 가격 분석을 수행해주세요.
+  const releaseYear = si?.year || (typeof LEGO_DB !== 'undefined' && LEGO_DB[setNumber] ? LEGO_DB[setNumber][1] : null);
+  const msrp = si?.msrpKR || null;
 
-        제품 번호: ${setNumber}
-        사용자가 입력한 현재 가격: ${currentPrice}원
-        데이터 간격: ${appState.chartInterval === 'weekly' ? '주차별 (Weekly)' : '월별 (Monthly)'}
-        ${knownInfo}
+  const prompt = `당신은 레고 가격 분석 전문가입니다. 레고 ${setNumber}에 대해 Google Search를 사용하여 실제 가격 정보를 조사해주세요.
 
-        [반드시 Google Search로 검색해야 할 항목들]
-        Step 1: "레고 ${setNumber} 가격" 또는 "LEGO ${setNumber} 가격" 검색 → 네이버쇼핑, 쿠팡, 11번가, 레고코리아 공식 등의 현재 판매가 확인
-        Step 2: "레고 ${setNumber} 최저가" 검색 → 다나와/에누리/네이버 가격비교에서 역대 최저가 및 가격 히스토리 확인
-        Step 3: "레고 ${setNumber} 중고" 또는 "레고 ${setNumber} MISB" 검색 → 번개장터/당근마켓/레고 커뮤니티 중고 시세 확인
-        Step 4: "LEGO ${setNumber} bricklink" 검색 → BrickLink 가격 가이드 확인
-        Step 5: "LEGO ${setNumber} amazon" 검색 → Amazon 가격 확인
+제품 번호: ${setNumber}${si ? `\n제품명: ${si.name}` : ''}${releaseYear ? `\n출시 연도: ${releaseYear}` : ''}${msrp ? `\n한국 정가(MSRP): ${msrp.toLocaleString()}원` : ''}
+사용자 현재 가격: ${currentPrice ? currentPrice + '원' : '미입력'}
 
-        [분석 및 출력 요구사항]
-        1. 정가(MSRP), 부품 수(Piece Count)를 확인하세요${si ? ' (위 확정 정보 사용)' : ''}.
-        2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요 (Google Search에서 확인된 실제 데이터만).
-        3. 출시 이후부터 현재까지의 ${appState.chartInterval === 'weekly' ? '주차별' : '월별'} 가격 변동 트렌드를 기록하세요 (새상품 기준, historicalData 필드). 다나와/에누리/네이버 가격비교 히스토리를 우선 참조하세요.
-        4. 중고 시장(MISB 기준)의 가격 변동 트렌드도 함께 기록하세요 (historicalDataUsed 필드). 번개장터, 당근, 레고 커뮤니티 실거래가 참조.
-        5. 현재 판매 중인 주요 쇼핑몰 목록과 가격: 네이버쇼핑, 레고코리아 공식, 이마트, 롯데마트, 홈플러스, 롯데온, 쿠팡, 11번가, 토이저러스 등. URL은 제공하지 말고 mall name만 정확히 기재하세요 (프론트엔드에서 자동 생성).
-        6. 중고 시장 시세:
-           - MISB (미개봉 새제품)
-           - MIB (박스 개봉, 내부 봉지 미개봉)
-           - Used (조립 완료 또는 박스 없는 중고)
-        7. 단종 예상 시기와 위험도(low/medium/high).
-        8. 재테크 지수(0-100)와 해외 가격(Amazon USD, BrickLink USD).
+【검색 지시】다음 순서로 Google Search를 실행하세요:
+1. "레고 ${setNumber} 쿠팡" 검색 → 쿠팡 현재가
+2. "레고 ${setNumber} 네이버쇼핑" 검색 → 네이버 최저가, 정가
+3. "레고 ${setNumber} 최저가" 검색 → 역대 최저가 (다나와, 에누리, 가격비교 사이트)
+4. "레고 ${setNumber} 중고 MISB" 검색 → 번개장터/당근 중고 시세
+5. "LEGO ${setNumber} bricklink price" 검색 → BrickLink 가격 가이드
 
-        [중요 주의사항]
-        - URL은 절대 생성하지 마세요 (malls 배열의 url 필드는 "" 빈 문자열로)
-        - 가격 데이터는 반드시 Google Search로 조회한 실제 데이터만 사용하세요
-        - 데이터를 찾지 못한 경우 null로 표시하고, 절대 추정값을 실제 데이터처럼 제시하지 마세요
-        - historicalData는 실제 확인된 가격 변동만 포함하세요 (최소 5개, 최대 24개)
+【출력 규칙】
+- 검색에서 확인된 가격만 malls 배열에 포함 (추정 금지)
+- historicalData: 출시부터 현재까지 ${appState.chartInterval === 'monthly' ? '월별' : '주차별'} 새제품 가격 흐름 (최저 8개 포인트). 검색에서 특정 시점 가격이 확인되면 반드시 반영. 확인 안 된 구간은 LEGO 한국시장 패턴(정가→할인 이벤트→단종 후 상승)으로 추정하되 realistic하게 작성
+- historicalDataUsed: MISB 중고 가격 흐름 (출시 직후 정가 근처 → 단종 후 프리미엄 패턴)
+- malls의 url 필드는 반드시 "" (빈 문자열)
+- 데이터를 찾지 못한 숫자 필드는 null
 
-        [출력 형식 - JSON만 출력]
-        {
-          "title": "제품 정식 이름 (한글 포함)",
-          "imageUrl": "https://images.brickset.com/sets/images/${setNumber}-1.jpg",
-          "status": "buy",
-          "statusText": "...",
-          "summary": "...",
-          "evidence": "...",
-          "tip": "...",
-          "originalPrice": 123000,
-          "averagePrice": 110000,
-          "lowestPrice": 95000,
-          "lowestPriceDate": "2023-11-24",
-          "lowestPriceMall": "쿠팡",
-          "pieceCount": 1500,
-          "ppp": 82,
-          "usedPrices": { "misb": 130000, "mib": 110000, "used": 85000 },
-          "retirementRisk": "low",
-          "retirementReason": "...",
-          "investmentScore": 85,
-          "investmentReason": "...",
-          "globalPrices": { "amazon": 99.99, "bricklink": 110.00, "currency": "USD" },
-          "malls": [{ "name": "쿠팡", "price": 105000, "discountRate": 15, "url": "", "isLowest": true }],
-          "historicalData": [{ "date": "2023-01-01", "price": 123000, "mall": "네이버쇼핑", "mallUrl": "", "discountRate": 0 }],
-          "historicalDataUsed": [{ "date": "2023-01-01", "price": 115000, "mall": "번개장터", "mallUrl": "", "discountRate": 0 }]
-        }
+【JSON 형식으로만 출력】
+{
+  "title": "제품명 (한글 포함)",
+  "imageUrl": "https://images.brickset.com/sets/images/${setNumber}-1.jpg",
+  "status": "buy|wait|hold",
+  "statusText": "이모지 한줄 진단",
+  "summary": "2-3문장 분석 요약",
+  "evidence": "검색에서 찾은 근거 (가격 출처 명시)",
+  "tip": "구매 팁",
+  "originalPrice": ${msrp || 'null'},
+  "averagePrice": null,
+  "lowestPrice": null,
+  "lowestPriceDate": null,
+  "lowestPriceMall": null,
+  "pieceCount": ${si?.numParts || 'null'},
+  "ppp": null,
+  "usedPrices": { "misb": null, "mib": null, "used": null },
+  "retirementRisk": "low|medium|high",
+  "retirementReason": "단종 위험 근거",
+  "investmentScore": null,
+  "investmentReason": "재테크 분석",
+  "globalPrices": { "amazon": null, "bricklink": null, "currency": "USD" },
+  "malls": [{ "name": "쿠팡", "price": null, "discountRate": null, "url": "", "isLowest": false }],
+  "historicalData": [{ "date": "YYYY-MM-01", "price": 0, "mall": "출처", "mallUrl": "", "discountRate": 0 }],
+  "historicalDataUsed": [{ "date": "YYYY-MM-01", "price": 0, "mall": "번개장터", "mallUrl": "", "discountRate": 0 }]
+}
 
-        반드시 한국어로 답변하고, Google Search를 단계별로 실행하여 실제 데이터를 최대한 반영하세요.
-      `;
+한국어로 답변하세요. JSON 외 다른 텍스트 없이 JSON만 출력하세요.`;
 
   try {
     let text = null;
@@ -590,33 +542,12 @@ window.analyzeLego = async () => {
   }
 };
 
-// ── AUTH UI ──────────────────────────────────────────────
-function renderAuth() {
-  const el = document.getElementById('auth-section');
-  const u = appState.user;
-  if (u) {
-    el.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.1);padding:6px 16px 6px 6px;border-radius:9999px;border:1px solid rgba(255,255,255,0.1);">
-        <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.2);">
-          <img src="${u.photoURL||''}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">
-        </div>
-        <div class="hidden sm:block">
-          <div style="font-size:10px;font-weight:900;color:rgba(255,255,255,0.6);text-transform:uppercase;line-height:1;margin-bottom:2px;">WELCOME</div>
-          <div style="font-size:12px;font-weight:900;color:white;line-height:1;">${u.displayName||''}</div>
-        </div>
-        <button onclick="window._logout()" title="로그아웃" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.6);font-size:14px;padding:4px;">✕</button>
-      </div>`;
-  } else {
-    el.innerHTML = `<button onclick="window._login()" style="display:flex;align-items:center;gap:8px;background:white;color:#e53935;padding:8px 16px;border-radius:9999px;font-weight:900;font-size:14px;border:none;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);">🔑 로그인</button>`;
-  }
-}
-
 // ── WISHLIST UI ──────────────────────────────────────────
 function renderWishlist() {
   const sec = document.getElementById('wishlist-section');
   const grid = document.getElementById('wishlist-grid');
   const count = document.getElementById('wishlist-count');
-  if (!appState.user || appState.wishlist.length === 0) { sec.style.display = 'none'; return; }
+  if (appState.wishlist.length === 0) { sec.style.display = 'none'; return; }
   sec.style.display = 'block';
   count.textContent = `${appState.wishlist.length}개의 제품`;
   grid.innerHTML = appState.wishlist.map(item => `
@@ -741,12 +672,6 @@ window.applyCategoryFilters = () => {
   if (isWishlist) {
     // 찜 목록 모드
     const wl = appState.wishlist || [];
-    if (!appState.user) {
-      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#70757a;font-weight:700;">
-        로그인 후 찜 목록을 사용할 수 있어요 🔑</div>`;
-      document.getElementById('category-count').textContent = '';
-      return;
-    }
     if (wl.length === 0) {
       grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:#70757a;font-weight:700;">
         아직 찜한 제품이 없어요 ❤️</div>`;
@@ -1446,7 +1371,6 @@ document.addEventListener('click', (e) => {
 });
 
 // Init
-renderAuth();
 renderWishlist();
 initCategoryBrowser();
 </script>

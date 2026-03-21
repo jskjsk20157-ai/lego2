@@ -315,6 +315,17 @@ window.removeGeminiKey = (i) => {
   renderSettingsPopup();
 };
 
+// ── JSON EXTRACT ─────────────────────────────────────────
+function extractJson(text) {
+  if (!text) return null;
+  try { return JSON.parse(text); } catch {}
+  const md = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (md) { try { return JSON.parse(md[1]); } catch {} }
+  const obj = text.match(/\{[\s\S]*\}/);
+  if (obj) { try { return JSON.parse(obj[0]); } catch {} }
+  return null;
+}
+
 // ── GEMINI CALL ──────────────────────────────────────────
 async function callGemini(prompt) {
   let key = getActiveKey();
@@ -327,13 +338,14 @@ async function callGemini(prompt) {
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           tools: [{ google_search: {} }],
-          generationConfig: { responseMimeType: 'application/json' }
         })
       }
     );
     if (res.ok) {
       const data = await res.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      // google_search 사용 시 여러 parts가 올 수 있으므로 전체 text 합치기
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      return parts.map(p => p.text || '').join('');
     }
     const errData = await res.json().catch(() => ({}));
     const msg = errData?.error?.message || '';
@@ -455,7 +467,9 @@ window.analyzeLego = async () => {
       }
     }
     if (!text) throw new Error('빈 응답을 받았습니다.');
-    appState.result = JSON.parse(text);
+    const parsed = extractJson(text);
+    if (!parsed) throw new Error('JSON 파싱 실패. 다시 시도해주세요.');
+    appState.result = parsed;
     appState.result._usedModel = usedModel;
     appState.activeTab = 'new';
     appState.usedCategory = 'misb';

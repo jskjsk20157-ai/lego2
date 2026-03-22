@@ -593,12 +593,12 @@ window.analyzeLego = async () => {
         [분석 및 출력 요구사항]
         1. 제품명(title), 정가(MSRP), 부품 수(Piece Count), 이미지 URL(imageUrl - 공식 또는 고화질 예상 URL)을 확인하세요.
         2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요.
-        3. 출시 이후 월별 가격 변동 트렌드 조사 (새상품 기준, historicalData 필드) - 이것은 필수입니다!
+        3. 출시 이후 가격 변동 트렌드 조사 (새상품 기준, historicalData 필드) - 이것은 필수입니다!
            - Google Search로 가격 변동 데이터 수집
-           - 데이터 포인트는 최소 12개 이상, 최대 36개 포함
-           - 날짜 형식은 YYYY-MM-DD로 통일 (항상 매월 1일로)
+           - 최대한 많은 날짜의 데이터 포인트 포함 (최소 20개 이상, 가능하면 30개 이상)
+           - 날짜 형식은 YYYY-MM-DD로 통일 (가능한 한 자주 - 주별 또는 더 자주)
            - 각 데이터포인트마다 반드시 "mall" 필드 포함 (쿠팡, 네이버쇼핑, 지마켓, 아마존 등)
-           - 예: { "date": "2023-01-01", "price": 150000, "mall": "쿠팡" }
+           - 예: { "date": "2025-01-05", "price": 150000, "mall": "쿠팡" }, { "date": "2025-01-12", "price": 148000, "mall": "네이버" }
         4. 현재 유통 중인 주요 쇼핑몰의 실시간 가격을 조사하세요.
         5. 이 제품의 단종 예상 시기와 단종 위험도를 분석하세요.
         6. 재테크 지수(0-100)를 산정하세요.
@@ -627,31 +627,39 @@ window.analyzeLego = async () => {
             { "name": "쇼핑몰", "price": 105000, "discountRate": 15, "url": "URL", "isLowest": true }
           ],
           "historicalData": [
-            { "date": "2024-03-01", "price": 123000, "mall": "쿠팡" },
-            { "date": "2024-04-01", "price": 120000, "mall": "쿠팡" },
-            { "date": "2024-05-01", "price": 118000, "mall": "네이버" },
-            { "date": "2024-06-01", "price": 116000, "mall": "쿠팡" },
-            { "date": "2024-07-01", "price": 115000, "mall": "지마켓" },
-            { "date": "2024-08-01", "price": 112000, "mall": "쿠팡" },
-            { "date": "2024-09-01", "price": 110000, "mall": "네이버" },
-            { "date": "2024-10-01", "price": 108000, "mall": "쿠팡" },
-            { "date": "2024-11-01", "price": 105000, "mall": "지마켓" },
-            { "date": "2024-12-01", "price": 103000, "mall": "쿠팡" },
-            { "date": "2025-01-01", "price": 102000, "mall": "네이버" },
-            { "date": "2025-02-01", "price": 100000, "mall": "쿠팡" },
-            { "date": "2025-03-01", "price": 99000, "mall": "지마켓" },
-            { "date": "2025-04-01", "price": 97000, "mall": "쿠팡" },
-            { "date": "2025-05-01", "price": 95000, "mall": "네이버" },
-            { "date": "2025-06-01", "price": 93000, "mall": "쿠팡" },
-            { "date": "2025-07-01", "price": 91000, "mall": "지마켓" },
-            { "date": "2025-08-01", "price": 89000, "mall": "쿠팡" },
-            { "date": "2025-09-01", "price": 87000, "mall": "네이버" },
-            { "date": "2025-10-01", "price": 85000, "mall": "쿠팡" },
-            { "date": "2025-11-01", "price": 84000, "mall": "지마켓" },
-            { "date": "2025-12-01", "price": 82000, "mall": "쿠팡" },
-            { "date": "2026-01-01", "price": 80000, "mall": "네이버" },
-            { "date": "2026-02-01", "price": 78000, "mall": "쿠팡" },
-            { "date": "2026-03-01", "price": 76000, "mall": "지마켓" }
+            { "date": "2025-01-05", "price": 150000, "mall": "쿠팡" },
+            { "date": "2025-01-12", "price": 148000, "mall": "네이버" },
+            { "date": "2025-01-19", "price": 146000, "mall": "쿠팡" },
+            { "date": "2025-01-26", "price": 144000, "mall": "지마켓" },
+            { "date": "2025-02-02", "price": 142000, "mall": "쿠팡" },
+            { "date": "2025-02-09", "price": 140000, "mall": "네이버" },
+            { "date": "2025-02-16", "price": 138000, "mall": "쿠팡" },
+            { "date": "2025-02-23", "price": 136000, "mall": "지마켓" },
+            { "date": "2025-03-02", "price": 134000, "mall": "쿠팡" },
+            { "date": "2025-03-09", "price": 132000, "mall": "네이버" },
+            { "date": "2025-03-16", "price": 130000, "mall": "쿠팡" },
+            { "date": "2025-03-23", "price": 128000, "mall": "지마켓" },
+            { "date": "2025-03-30", "price": 126000, "mall": "쿠팡" },
+            { "date": "2025-04-06", "price": 124000, "mall": "네이버" },
+            { "date": "2025-04-13", "price": 122000, "mall": "쿠팡" },
+            { "date": "2025-04-20", "price": 120000, "mall": "지마켓" },
+            { "date": "2025-04-27", "price": 118000, "mall": "쿠팡" },
+            { "date": "2025-05-04", "price": 116000, "mall": "네이버" },
+            { "date": "2025-05-11", "price": 114000, "mall": "쿠팡" },
+            { "date": "2025-05-18", "price": 112000, "mall": "지마켓" },
+            { "date": "2025-05-25", "price": 110000, "mall": "쿠팡" },
+            { "date": "2025-06-01", "price": 108000, "mall": "네이버" },
+            { "date": "2025-06-08", "price": 106000, "mall": "쿠팡" },
+            { "date": "2025-06-15", "price": 104000, "mall": "지마켓" },
+            { "date": "2025-06-22", "price": 102000, "mall": "쿠팡" },
+            { "date": "2025-06-29", "price": 100000, "mall": "네이버" },
+            { "date": "2025-07-06", "price": 98000, "mall": "쿠팡" },
+            { "date": "2025-07-13", "price": 96000, "mall": "지마켓" },
+            { "date": "2025-07-20", "price": 94000, "mall": "쿠팡" },
+            { "date": "2025-07-27", "price": 92000, "mall": "네이버" },
+            { "date": "2025-08-03", "price": 90000, "mall": "쿠팡" },
+            { "date": "2025-08-10", "price": 88000, "mall": "지마켓" },
+            { "date": "2025-08-17", "price": 86000, "mall": "쿠팡" }
           ]
         }
 
@@ -1340,17 +1348,23 @@ function getFilteredData() {
 
 function filterDataByInterval(data, interval) {
   if (interval === 'monthly') {
-    // 매월 1일 데이터만 표시
-    return data.filter(d => d.date.endsWith('-01'));
+    // 매월 첫 번째 데이터만 표시 (또는 -01)
+    const byMonth = {};
+    data.forEach(d => {
+      const yearMonth = d.date.slice(0, 7); // YYYY-MM
+      if (!byMonth[yearMonth]) byMonth[yearMonth] = d;
+    });
+    return Object.values(byMonth).sort((a, b) => new Date(a.date) - new Date(b.date));
   } else if (interval === 'weekly') {
-    // 매주 월요일(또는 7일마다) 데이터만 표시
+    // 약 7일 간격으로 데이터 선택
     if (data.length === 0) return data;
+    if (data.length <= 4) return data; // 데이터가 너무 적으면 그냥 반환
     const filtered = [data[0]]; // 첫 데이터 포함
     for (let i = 1; i < data.length; i++) {
       const lastDate = new Date(filtered[filtered.length - 1].date);
       const currDate = new Date(data[i].date);
       const daysDiff = Math.floor((currDate - lastDate) / (1000 * 60 * 60 * 24));
-      if (daysDiff >= 7) filtered.push(data[i]);
+      if (daysDiff >= 6) filtered.push(data[i]); // 6일 이상
     }
     return filtered;
   }

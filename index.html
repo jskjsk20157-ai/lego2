@@ -1313,45 +1313,23 @@ function getFilteredData() {
   return data.filter(p => new Date(p.date) >= cutoff);
 }
 
-function aggregateByMonth(data) {
-  if (data.length === 0) return data;
-  const grouped = {};
-  data.forEach(d => {
-    const yearMonth = d.date.slice(0, 7);
-    if (!grouped[yearMonth]) grouped[yearMonth] = [];
-    grouped[yearMonth].push(d);
-  });
-  return Object.entries(grouped).map(([yearMonth, items]) => {
-    const avgPrice = Math.round(items.reduce((sum, d) => sum + d.price, 0) / items.length);
-    const malls = items.map(d => d.mall).filter((m, i, arr) => arr.indexOf(m) === i);
-    return {
-      date: yearMonth + '-01',
-      price: avgPrice,
-      mall: malls[0] || '평균'
-    };
-  });
-}
-
-function aggregateByWeek(data) {
-  if (data.length === 0) return data;
-  const grouped = {};
-  data.forEach(d => {
-    const date = new Date(d.date);
-    const weekStart = new Date(date);
-    weekStart.setDate(date.getDate() - date.getDay());
-    const weekKey = weekStart.toISOString().slice(0, 10);
-    if (!grouped[weekKey]) grouped[weekKey] = [];
-    grouped[weekKey].push(d);
-  });
-  return Object.entries(grouped).map(([weekStart, items]) => {
-    const avgPrice = Math.round(items.reduce((sum, d) => sum + d.price, 0) / items.length);
-    const malls = items.map(d => d.mall).filter((m, i, arr) => arr.indexOf(m) === i);
-    return {
-      date: weekStart,
-      price: avgPrice,
-      mall: malls[0] || '평균'
-    };
-  });
+function filterDataByInterval(data, interval) {
+  if (interval === 'monthly') {
+    // 매월 1일 데이터만 표시
+    return data.filter(d => d.date.endsWith('-01'));
+  } else if (interval === 'weekly') {
+    // 매주 월요일(또는 7일마다) 데이터만 표시
+    if (data.length === 0) return data;
+    const filtered = [data[0]]; // 첫 데이터 포함
+    for (let i = 1; i < data.length; i++) {
+      const lastDate = new Date(filtered[filtered.length - 1].date);
+      const currDate = new Date(data[i].date);
+      const daysDiff = Math.floor((currDate - lastDate) / (1000 * 60 * 60 * 24));
+      if (daysDiff >= 7) filtered.push(data[i]);
+    }
+    return filtered;
+  }
+  return data;
 }
 
 function updateChart() {
@@ -1366,12 +1344,8 @@ function updateChart() {
     return;
   }
 
-  // 주별/월별 집계
-  if (appState.chartInterval === 'weekly') {
-    data = aggregateByWeek(data);
-  } else if (appState.chartInterval === 'monthly') {
-    data = aggregateByMonth(data);
-  }
+  // 주별/월별 필터링 (X축 간격 변경)
+  const displayData = filterDataByInterval(data, appState.chartInterval);
 
   const containerW = inner.parentElement?.offsetWidth || 600;
   const canvasW = data.length > 12 ? data.length * 40 : containerW;
@@ -1383,7 +1357,7 @@ function updateChart() {
 
   const color = appState.activeTab === 'new' ? '#e53935' : '#42a5f5';
   const datasets = [{
-    data: data.map(d => d.price),
+    data: displayData.map(d => d.price),
     borderColor: color,
     borderWidth: 4,
     pointBackgroundColor: color,
@@ -1397,7 +1371,7 @@ function updateChart() {
 
   if (appState.activeTab === 'new' && appState.currentPrice) {
     datasets.push({
-      data: data.map(() => Number(appState.currentPrice)),
+      data: displayData.map(() => Number(appState.currentPrice)),
       borderColor: '#42a5f5',
       borderWidth: 2,
       borderDash: [5, 5],
@@ -1409,7 +1383,7 @@ function updateChart() {
 
   appState.chart = new Chart(canvas, {
     type: 'line',
-    data: { labels: data.map(d => d.date), datasets },
+    data: { labels: displayData.map(d => d.date), datasets },
     options: {
       responsive: false,
       animation: false,
@@ -1424,7 +1398,7 @@ function updateChart() {
           callbacks: {
             label: (item) => {
               if (item.datasetIndex === 1) return `현재가: ₩${item.raw.toLocaleString()}`;
-              const d = data[item.dataIndex];
+              const d = displayData[item.dataIndex];
               const lines = [`가격: ₩${item.raw.toLocaleString()}`];
               if (d?.mall) lines.push(`판매처: ${d.mall}`);
               if (d?.discountRate) lines.push(`할인율: ${d.discountRate}%`);
@@ -1444,7 +1418,7 @@ function updateChart() {
       },
       onClick: (e, elements) => {
         if (elements.length && elements[0].datasetIndex === 0) {
-          const d = data[elements[0].index];
+          const d = displayData[elements[0].index];
           if (d?.mall) window.open(getMallUrl(d.mall, appState.setNumber), '_blank');
         }
       }

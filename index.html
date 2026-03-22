@@ -626,39 +626,6 @@ window.analyzeLego = async () => {
         반드시 한국어로 답변하세요.
       `;
 
-          "lowestPrice": 95000,
-          "lowestPriceDate": "2023-11-24",
-          "lowestPriceMall": "...",
-          "pieceCount": 1500,
-          "ppp": 82,
-          "usedPrices": {
-            "misb": 130000,
-            "mib": 110000,
-            "used": 85000
-          },
-          "retirementRisk": "low" | "medium" | "high",
-          "retirementReason": "...",
-          "investmentScore": 85,
-          "investmentReason": "...",
-          "globalPrices": {
-            "amazon": 99.99,
-            "bricklink": 110.00,
-            "currency": "USD"
-          },
-          "malls": [
-            { "name": "...", "price": 105000, "discountRate": 15, "url": "...", "isLowest": true }
-          ],
-          "historicalData": [
-            { "date": "2023-01-01", "price": 123000, "mall": "...", "mallUrl": "...", "discountRate": 0 }
-          ],
-          "historicalDataUsed": [
-            { "date": "2023-01-01", "price": 115000, "mall": "중고장터", "mallUrl": "...", "discountRate": 0 }
-          ]
-        }
-
-        반드시 한국어로 답변하고, Google Search를 활용하여 실제 데이터를 최대한 반영하세요.
-      `;
-
   try {
     let text = null;
     text = await callGemini(prompt);

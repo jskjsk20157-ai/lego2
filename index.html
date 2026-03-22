@@ -594,7 +594,9 @@ ${msrp ? `[중요] 정가(MSRP): ₩${msrp.toLocaleString()}원. 이것을 기�
 
         [분석 및 출력 요구사항]
         1. 제품명(title)을 확인하세요.
-        2. 정가(MSRP, 공식 정가)를 반드시 조사하세요 - 이것은 필수입니다!
+        2. 정가(MSRP)를 반드시 LEGO 공식 홈페이지(lego.com 또는 brickset.com)에서 조사하세요 - 이것은 필수입니다!
+           - 한국 공식 판매처: LEGO 공식 사이트의 한글 페이지
+           - 정확한 출시가 기준으로 기록
         3. 부품 수(Piece Count)와 이미지 URL(imageUrl)을 확인하세요.
         4. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요.
         3. 출시 이후 주요 할인/이벤트 기반 가격 변동 기록 (새상품 기준, historicalData 필드) - 이것은 필수입니다!
@@ -623,7 +625,7 @@ ${msrp ? `[중요] 정가(MSRP): ₩${msrp.toLocaleString()}원. 이것을 기�
           "summary": "분석요약",
           "evidence": "근거",
           "tip": "팁",
-          "originalPrice": 123000,
+          "originalPrice": 100000,
           "averagePrice": 110000,
           "lowestPrice": 95000,
           "lowestPriceDate": "2023-11-24",
@@ -671,7 +673,9 @@ ${msrp ? `[중요] 정가(MSRP): ₩${msrp.toLocaleString()}원. 이것을 기�
           ]
         }
 
-        반드시 정확히 위 JSON 형식을 따르세요. historicalData는 반드시 위 예제처럼 12개 이상의 월별 데이터를 포함해야 합니다.
+        반드시 정확히 위 JSON 형식을 따르세요.
+        - originalPrice는 반드시 LEGO 공식 홈페이지(lego.com 또는 brickset.com)에서 가져온 정가입니다.
+        - historicalData는 반드시 12개 이상의 실제 할인 기록을 포함해야 합니다.
         반드시 한국어로 답변하세요.
       `;
 

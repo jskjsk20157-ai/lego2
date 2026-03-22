@@ -593,8 +593,10 @@ ${msrp ? `[중요] 정가(MSRP): ₩${msrp.toLocaleString()}원. 이것을 기�
         사용자가 입력한 현재 가격: ${currentPrice}원
 
         [분석 및 출력 요구사항]
-        1. 제품명(title), 정가(MSRP), 부품 수(Piece Count), 이미지 URL(imageUrl - 공식 또는 고화질 예상 URL)을 확인하세요.
-        2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요.
+        1. 제품명(title)을 확인하세요.
+        2. 정가(MSRP, 공식 정가)를 반드시 조사하세요 - 이것은 필수입니다!
+        3. 부품 수(Piece Count)와 이미지 URL(imageUrl)을 확인하세요.
+        4. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요.
         3. 출시 이후 주요 할인/이벤트 기반 가격 변동 기록 (새상품 기준, historicalData 필드) - 이것은 필수입니다!
            - Google Search로 주요 할인 이벤트 기간 가격 데이터 수집
            - 명절, 세일, 특가 기간의 의미 있는 할인만 기록 (최소 15개 이상, 가능하면 25개 이상)
@@ -1423,6 +1425,20 @@ function updateChart() {
       pointRadius: 0,
       tension: 0,
       fill: false,
+      label: '현재가'
+    });
+  }
+
+  if (appState.activeTab === 'new' && appState.result?.originalPrice) {
+    datasets.push({
+      data: displayData.map(() => appState.result.originalPrice),
+      borderColor: '#ef4444',
+      borderWidth: 2,
+      borderDash: [10, 5],
+      pointRadius: 0,
+      tension: 0,
+      fill: false,
+      label: '정가'
     });
   }
 

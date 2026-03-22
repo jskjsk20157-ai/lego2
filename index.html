@@ -593,10 +593,12 @@ window.analyzeLego = async () => {
         [분석 및 출력 요구사항]
         1. 제품명(title), 정가(MSRP), 부품 수(Piece Count), 이미지 URL(imageUrl - 공식 또는 고화질 예상 URL)을 확인하세요.
         2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요.
-        3. 출시 이후 월별 가격 변동 트렌드를 조사하세요. (새상품 기준, historicalData 필드)
-           - 데이터 포인트는 반드시 12개 이상 포함되어야 합니다.
-           - 날짜 형식은 YYYY-MM-DD로 통일하세요.
-           - 각 가격 데이터포인트마다 "mall" 필드에 어느 쇼핑몰인지 명시하세요 (예: "쿠팡", "네이버", "지마켓" 등).
+        3. 출시 이후 월별 가격 변동 트렌드 조사 (새상품 기준, historicalData 필드) - 이것은 필수입니다!
+           - Google Search로 가격 변동 데이터 수집
+           - 데이터 포인트는 최소 12개 이상, 최대 36개 포함
+           - 날짜 형식은 YYYY-MM-DD로 통일 (항상 매월 1일로)
+           - 각 데이터포인트마다 반드시 "mall" 필드 포함 (쿠팡, 네이버쇼핑, 지마켓, 아마존 등)
+           - 예: { "date": "2023-01-01", "price": 150000, "mall": "쿠팡" }
         4. 현재 유통 중인 주요 쇼핑몰의 실시간 가격을 조사하세요.
         5. 이 제품의 단종 예상 시기와 단종 위험도를 분석하세요.
         6. 재테크 지수(0-100)를 산정하세요.
@@ -1311,16 +1313,64 @@ function getFilteredData() {
   return data.filter(p => new Date(p.date) >= cutoff);
 }
 
+function aggregateByMonth(data) {
+  if (data.length === 0) return data;
+  const grouped = {};
+  data.forEach(d => {
+    const yearMonth = d.date.slice(0, 7);
+    if (!grouped[yearMonth]) grouped[yearMonth] = [];
+    grouped[yearMonth].push(d);
+  });
+  return Object.entries(grouped).map(([yearMonth, items]) => {
+    const avgPrice = Math.round(items.reduce((sum, d) => sum + d.price, 0) / items.length);
+    const malls = items.map(d => d.mall).filter((m, i, arr) => arr.indexOf(m) === i);
+    return {
+      date: yearMonth + '-01',
+      price: avgPrice,
+      mall: malls[0] || '평균'
+    };
+  });
+}
+
+function aggregateByWeek(data) {
+  if (data.length === 0) return data;
+  const grouped = {};
+  data.forEach(d => {
+    const date = new Date(d.date);
+    const weekStart = new Date(date);
+    weekStart.setDate(date.getDate() - date.getDay());
+    const weekKey = weekStart.toISOString().slice(0, 10);
+    if (!grouped[weekKey]) grouped[weekKey] = [];
+    grouped[weekKey].push(d);
+  });
+  return Object.entries(grouped).map(([weekStart, items]) => {
+    const avgPrice = Math.round(items.reduce((sum, d) => sum + d.price, 0) / items.length);
+    const malls = items.map(d => d.mall).filter((m, i, arr) => arr.indexOf(m) === i);
+    return {
+      date: weekStart,
+      price: avgPrice,
+      mall: malls[0] || '평균'
+    };
+  });
+}
+
 function updateChart() {
   const canvas = document.getElementById('price-chart');
   const inner = document.getElementById('chart-inner');
   if (!canvas || !inner) return;
   if (appState.chart) { appState.chart.destroy(); appState.chart = null; }
 
-  const data = getFilteredData();
+  let data = getFilteredData();
   if (data.length === 0) {
     inner.innerHTML = '<div style="height:280px;display:flex;align-items:center;justify-content:center;color:#70757a;font-weight:700;">데이터 없음</div>';
     return;
+  }
+
+  // 주별/월별 집계
+  if (appState.chartInterval === 'weekly') {
+    data = aggregateByWeek(data);
+  } else if (appState.chartInterval === 'monthly') {
+    data = aggregateByMonth(data);
   }
 
   const containerW = inner.parentElement?.offsetWidth || 600;

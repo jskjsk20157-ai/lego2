@@ -394,7 +394,8 @@ async function lookupSetInfo(setNumber) {
   // 2. 로컬에 없으면 Gemini 1차 호출로 검색
   if (!getActiveKey()) return null;
   try {
-    const infoPrompt = `LEGO 세트 번호 "${setNumber}"의 기본 정보를 Google Search로 정확히 찾아주세요.
+    const infoPrompt = `LEGO 세트 번호 "${setNumber}"의 기본 정보를 Google Search로 찾아주세요.
+반드시 https://www.lego.com/ko-kr/product/${setNumber} 한국 공식 홈페이지에서 정가를 확인하세요.
 반드시 JSON만 반환하세요 (다른 텍스트 없이):
 {"name":"제품명","pieces":부품수,"year":출시년도,"msrpKR":한국정가(숫자),"theme":"테마"}
 숫자 필드는 따옴표 없이 숫자로. 모르면 null.`;
@@ -595,11 +596,10 @@ ${msrp ? `[중요] 정가(MSRP): ₩${msrp.toLocaleString()}원. 이것을 기�
 
         [분석 및 출력 요구사항]
         1. 제품명(title)을 확인하세요.
-        2. 정가(MSRP, RRP)를 반드시 LEGO 공식 홈페이지(lego.com 또는 brickset.com)에서 조사하세요 - 이것은 필수입니다!
-           - Brickset의 "RRP" 가격 정보를 우선 사용
-           - 미국 가격($)이나 영국 가격(£)을 찾아서 한국 환율(1 달러 = 약 1,300원)로 정확히 변환
-           - 가장 정확한 공식 가격만 기록 (중복되거나 높은 가격 제외)
-           - 예: $19.99 → ₩25,987 (O) | ₩44,900 (X 너무 비쌈)
+        2. 정가(MSRP)를 반드시 LEGO 한국 공식 홈페이지(https://www.lego.com/ko-kr/product/[SET_NUMBER])에서 조사하세요 - 이것은 필수입니다!
+           - 한국 공식 정가를 우선 사용
+           - 한국 홈페이지에 없으면 Brickset.com의 RRP 기준으로 한국 환율 변환
+           - 정가는 거의 변동하지 않으므로, 가장 최근의 공식 정가만 기록
         3. 부품 수(Piece Count)와 이미지 URL(imageUrl)을 확인하세요.
         4. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요.
         3. 출시 이후 주요 할인/이벤트 기반 가격 변동 기록 (새상품 기준, historicalData 필드)

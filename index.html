@@ -586,6 +586,8 @@ window.analyzeLego = async () => {
   const msrp = si?.msrpKR || null;
 
       const prompt = `레고 #${setNumber} 가격 분석. 현재가: ${currentPrice}원
+${releaseYear ? `[중요] 이 제품의 출시연도: ${releaseYear}년. 출시 이후부터의 가격만 기록하세요.` : ''}
+${msrp ? `[중요] 정가(MSRP): ₩${msrp.toLocaleString()}원. 이것을 기준으로 할인율을 계산하세요.` : ''}
 
         제품 번호: ${setNumber}
         사용자가 입력한 현재 가격: ${currentPrice}원

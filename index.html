@@ -591,6 +591,7 @@ window.analyzeLego = async () => {
         3. 출시 이후 월별 가격 변동 트렌드를 조사하세요. (새상품 기준, historicalData 필드)
            - 데이터 포인트는 반드시 12개 이상 포함되어야 합니다.
            - 날짜 형식은 YYYY-MM-DD로 통일하세요.
+           - 각 가격 데이터포인트마다 "mall" 필드에 어느 쇼핑몰인지 명시하세요 (예: "쿠팡", "네이버", "지마켓" 등).
         4. 현재 유통 중인 주요 쇼핑몰의 실시간 가격을 조사하세요.
         5. 이 제품의 단종 예상 시기와 단종 위험도를 분석하세요.
         6. 재테크 지수(0-100)를 산정하세요.
@@ -619,7 +620,7 @@ window.analyzeLego = async () => {
             { "name": "쇼핑몰", "price": 105000, "discountRate": 15, "url": "URL", "isLowest": true }
           ],
           "historicalData": [
-            { "date": "2024-01-01", "price": 123000 }
+            { "date": "2024-01-01", "price": 123000, "mall": "쿠팡" }
           ]
         }
 
@@ -1437,6 +1438,7 @@ window.switchInterval = (iv) => {
     btn.style.color = isActive ? '#42a5f5' : '#70757a';
     btn.style.boxShadow = isActive ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
   });
+  updateChart();
 };
 
 window.switchUsedCat = (cat) => {

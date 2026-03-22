@@ -373,8 +373,7 @@ async function callGemini(prompt) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          tools: [{ google_search: {} }],
+          contents: [{ role: 'user', parts: [{ text: prompt }] }]
         })
       }
     );
@@ -542,12 +541,7 @@ window.analyzeLego = async () => {
 제품 번호: ${setNumber}${si ? `\n제품명: ${si.name}` : ''}${releaseYear ? `\n출시 연도: ${releaseYear}` : ''}${msrp ? `\n한국 정가(MSRP): ${msrp.toLocaleString()}원` : ''}
 사용자 현재 가격: ${currentPrice ? currentPrice + '원' : '미입력'}
 
-【검색 지시】다음 순서로 Google Search를 실행하세요:
-1. "레고 ${setNumber} 쿠팡" 검색 → 쿠팡 현재가
-2. "레고 ${setNumber} 네이버쇼핑" 검색 → 네이버 최저가, 정가
-3. "레고 ${setNumber} 최저가" 검색 → 역대 최저가 (다나와, 에누리, 가격비교 사이트)
-4. "레고 ${setNumber} 중고 MISB" 검색 → 번개장터/당근 중고 시세
-5. "LEGO ${setNumber} bricklink price" 검색 → BrickLink 가격 가이드
+【분석 지시】한국 레고 시장 정보를 바탕으로 가격 분석을 수행하세요.
 
 【출력 규칙】
 - 검색에서 확인된 가격만 malls 배열에 포함 (추정 금지)

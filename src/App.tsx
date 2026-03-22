@@ -68,8 +68,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Initialize Gemini
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+// Gemini will be initialized at runtime with user's API key
 
 interface HistoricalPoint {
   date: string;
@@ -134,6 +133,7 @@ type AnalysisTab = 'new' | 'used';
 type UsedCategory = 'misb' | 'mib' | 'used';
 
 export default function App() {
+  const [apiKey, setApiKey] = useState('');
   const [setNumber, setSetNumber] = useState('');
   const [currentPrice, setCurrentPrice] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -237,90 +237,59 @@ export default function App() {
       return;
     }
 
+    if (!apiKey) {
+      setError('Gemini API 키를 입력해주세요.');
+      return;
+    }
+
     const targetInterval = overrideInterval || chartInterval;
     setIsAnalyzing(true);
     setError(null);
     setResult(null);
 
     try {
-      const model = "gemini-3-flash-preview";
-      const prompt = `
-        당신은 레고 시장 분석 전문가입니다. 다음 레고 제품에 대한 심층적인 역사적 가격 및 중고 시장 분석을 수행해주세요.
-        
-        제품 번호: ${setNumber}
-        사용자가 입력한 현재 가격: ${currentPrice}원
-        데이터 간격 요구사항: ${targetInterval === 'weekly' ? '최근 6개월간 매주(Weekly) 단위의 정밀한 가격 데이터' : '출시 이후 매월(Monthly) 단위의 가격 데이터'}
-        
-        [분석 및 출력 요구사항]
-        1. 제품명(title), 정가(MSRP), 부품 수(Piece Count), 이미지 URL(imageUrl - 공식 또는 고화질 예상 URL)을 확인하세요.
-        2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름, 그리고 해당 쇼핑몰의 당시 상품 URL(예상)을 포함하세요.
-        3. ${targetInterval === 'weekly' ? '최근 6개월간 주차별' : '출시 이후 월별'} 가격 변동 트렌드를 조사하세요. (새상품 기준, historicalData 필드)
-           - 데이터 포인트는 반드시 ${targetInterval === 'weekly' ? '20개 이상' : '12개 이상'} 포함되어야 합니다.
-           - 날짜 형식은 YYYY-MM-DD로 통일하세요.
-        4. 중고 시장(MISB 기준)의 동일 기간 가격 변동 트렌드도 함께 조사하세요. (historicalDataUsed 필드)
-        5. 현재 유통 중인 주요 쇼핑몰의 실시간 가격과 정확한 URL을 조사하세요.
-        6. 중고 시장 시세를 분석하세요 (MISB, MIB, Used).
-        7. 이 제품의 단종 예상 시기와 단종 위험도를 분석하세요.
-        8. 재테크 지수(0-100)와 해외 가격(Amazon, BrickLink)을 조사하세요.
-        
-        [출력 형식 - JSON]
-        {
-          "title": "제품명",
-          "imageUrl": "이미지 URL",
-          "status": "buy" | "wait" | "expensive",
-          "statusText": "...",
-          "summary": "...",
-          "evidence": "...",
-          "tip": "...",
-          "originalPrice": 123000,
-          "averagePrice": 110000,
-          "lowestPrice": 95000,
-          "lowestPriceDate": "2023-11-24",
-          "lowestPriceMall": "...",
-          "pieceCount": 1500,
-          "ppp": 82,
-          "usedPrices": {
-            "misb": 130000,
-            "mib": 110000,
-            "used": 85000
-          },
-          "retirementRisk": "low" | "medium" | "high",
-          "retirementReason": "...",
-          "investmentScore": 85,
-          "investmentReason": "...",
-          "globalPrices": {
-            "amazon": 99.99,
-            "bricklink": 110.00,
-            "currency": "USD"
-          },
-          "malls": [
-            { "name": "...", "price": 105000, "discountRate": 15, "url": "...", "isLowest": true }
-          ],
-          "historicalData": [
-            { "date": "2023-01-01", "price": 123000, "mall": "...", "mallUrl": "...", "discountRate": 0 }
-          ],
-          "historicalDataUsed": [
-            { "date": "2023-01-01", "price": 115000, "mall": "중고장터", "mallUrl": "...", "discountRate": 0 }
-          ]
-        }
-        
-        반드시 한국어로 답변하고, Google Search를 활용하여 실제 데이터를 최대한 반영하세요.
-      `;
+      const model = "gemini-2.0-flash";
+      const genAI = new GoogleGenAI({ apiKey });
+      const prompt = `당신은 레고 시장 분석 전문가입니다. LEGO 세트 #${setNumber}에 대한 분석을 JSON 형식으로 제공하세요. 현재 가격: ${currentPrice}원
+
+분석 항목:
+- title: 제품명
+- imageUrl: 이미지 URL (brickset.com 추정)
+- status: "buy", "wait", "expensive" 중 선택
+- statusText: 상태 설명 (20자 이내)
+- summary: 핵심 분석 (50자 이내)
+- evidence: 근거 (100자 이내)
+- tip: 구매 조언 (50자 이내)
+- originalPrice: 정가 (숫자)
+- averagePrice: 평균가 (숫자)
+- lowestPrice: 최저가 (숫자)
+- lowestPriceDate: 최저가 날짜 (YYYY-MM-DD)
+- lowestPriceMall: 최저가 판매처
+- pieceCount: 부품 수
+- ppp: 부품당 가격 (원)
+- usedPrices: {misb, mib, used} (각 숫자)
+- retirementRisk: "low", "medium", "high" 중 선택
+- retirementReason: 단종 위험 이유 (50자 이내)
+- investmentScore: 투자 지수 (0-100)
+- investmentReason: 투자 근거 (50자 이내)
+- globalPrices: {amazon, bricklink, currency}
+- malls: [{name, price, discountRate, url}] (최대 3개)
+- historicalData: [{date, price}] (최대 6개)
+- historicalDataUsed: [{date, price}] (최대 6개)
+
+한국 레고 시장 정보를 바탕으로 합리적인 추정값을 제시하세요. 응답은 유효한 JSON만 제공하세요.`;
 
       const response = await genAI.models.generateContent({
         model: model,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          tools: [{ googleSearch: {} }]
-        }
+        contents: [{ text: prompt }]
       });
 
       const data = JSON.parse(response.text || "{}");
       setResult(data);
     } catch (err) {
-      console.error(err);
-      setError('분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+      console.error('API Error:', err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setError(`오류: ${errorMsg}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -387,6 +356,22 @@ export default function App() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-10">
+        {/* API Key Input Section */}
+        <section className="bg-blue-50/80 backdrop-blur-sm rounded-[2rem] border-2 border-blue-200 p-6 mb-8 shadow-sm">
+          <div className="flex items-center gap-3 mb-3">
+            <ShieldAlert className="w-5 h-5 text-blue-600" />
+            <label className="text-sm font-black text-blue-900">Gemini API 키</label>
+          </div>
+          <input
+            type="password"
+            placeholder="sk-... 또는 AIzaSy..."
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="w-full px-4 py-3 bg-white border-2 border-blue-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-200/50 focus:border-blue-600 transition-all text-sm font-mono"
+          />
+          <p className="text-xs text-blue-700 mt-2">🔒 키는 브라우저에만 저장되며, 저장되지 않습니다.</p>
+        </section>
+
         {/* Search Section */}
         <section className="bg-white/80 backdrop-blur-sm rounded-[2rem] border-2 border-[#dadce0] p-8 mb-8 shadow-sm relative">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

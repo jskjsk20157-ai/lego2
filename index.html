@@ -273,6 +273,20 @@ window.appState = {
 const exhaustedKeys = new Set();
 const invalidKeys = new Set();
 
+// Groq API Key
+function getGroqKey() { return localStorage.getItem('lego_groq_key') || ''; }
+function saveGroqKey(key) {
+  localStorage.setItem('lego_groq_key', key.trim());
+  updateApiStatus();
+}
+
+// Tavily API Key
+function getTavilyKey() { return localStorage.getItem('lego_tavily_key') || ''; }
+function saveTavilyKey(key) {
+  localStorage.setItem('lego_tavily_key', key.trim());
+  updateApiStatus();
+}
+
 function getGeminiKeys() { return JSON.parse(localStorage.getItem('lego_gemini_keys') || '[]'); }
 function saveGeminiKeys(keys) { localStorage.setItem('lego_gemini_keys', JSON.stringify(keys)); }
 function getActiveKey() { return getGeminiKeys().find(k => !exhaustedKeys.has(k) && !invalidKeys.has(k)) || null; }
@@ -280,6 +294,34 @@ function keyStatus(k) {
   if (invalidKeys.has(k)) return { icon: '🔴', label: '오류' };
   if (exhaustedKeys.has(k)) return { icon: '🟡', label: '소진됨' };
   return { icon: '🟢', label: '활성' };
+}
+
+function updateApiStatus() {
+  const groqKey = getGroqKey();
+  const tavilyKey = getTavilyKey();
+  document.getElementById('groq-status').textContent = groqKey ? '✅ 저장됨' : '❌ 키 없음';
+  document.getElementById('tavily-status').textContent = tavilyKey ? '✅ 저장됨' : '❌ 키 없음';
+}
+
+window.setupKeys = () => {
+  let groqKey = getGroqKey();
+  let tavilyKey = getTavilyKey();
+
+  const groq = prompt('Groq API 키 입력\n(현재: ' + (groqKey ? groqKey.slice(0, 8) + '...' : '없음') + '):', groqKey);
+  if (groq !== null) {
+    localStorage.setItem('lego_groq_key', groq.trim());
+  }
+
+  const tavily = prompt('Tavily API 키 입력\n(현재: ' + (tavilyKey ? tavilyKey.slice(0, 8) + '...' : '없음') + '):', tavilyKey);
+  if (tavily !== null) {
+    localStorage.setItem('lego_tavily_key', tavily.trim());
+  }
+
+  groqKey = getGroqKey();
+  tavilyKey = getTavilyKey();
+  if (groqKey && tavilyKey) {
+    alert('✅ API 키 저장 완료!\n\nGroq: ' + groqKey.slice(0, 8) + '...\nTavily: ' + tavilyKey.slice(0, 8) + '...');
+  }
 }
 
 window.toggleSettings = () => {
@@ -368,7 +410,7 @@ async function callGemini(prompt) {
   let key = getActiveKey();
   while (key) {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -379,12 +421,13 @@ async function callGemini(prompt) {
     );
     if (res.ok) {
       const data = await res.json();
-      // google_search 사용 시 여러 parts가 올 수 있으므로 전체 text 합치기
       const parts = data?.candidates?.[0]?.content?.parts || [];
       return parts.map(p => p.text || '').join('');
     }
     const errData = await res.json().catch(() => ({}));
     const msg = errData?.error?.message || '';
+    console.log(`[Gemini API Error] Status: ${res.status}, Message: ${msg}, Key: ${key.slice(0, 8)}...`);
+
     if (res.status === 429 || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
       exhaustedKeys.add(key);
       key = getActiveKey();
@@ -395,7 +438,7 @@ async function callGemini(prompt) {
       throw new Error(msg || `HTTP ${res.status}`);
     }
   }
-  return null; // no more Gemini keys
+  return null;
 }
 
 // ── ANALYZE ──────────────────────────────────────────────
@@ -494,10 +537,11 @@ window.analyzeLego = async () => {
   const currentPrice = (document.getElementById('price-input').value || '').trim();
 
   if (!setNumber || !currentPrice) { showError('제품 번호와 현재 가격을 모두 입력해주세요.'); return; }
+
   if (!getActiveKey()) {
     document.getElementById('settings-popup').style.display = 'block';
     renderSettingsPopup();
-    showError('⚙️ API 키를 먼저 설정해주세요.');
+    showError('⚙️ Gemini API 키를 먼저 설정해주세요.');
     return;
   }
 
@@ -536,52 +580,37 @@ window.analyzeLego = async () => {
   const releaseYear = si?.year || (typeof LEGO_DB !== 'undefined' && LEGO_DB[setNumber] ? LEGO_DB[setNumber][1] : null);
   const msrp = si?.msrpKR || null;
 
-  const prompt = `당신은 레고 가격 분석 전문가입니다. 레고 ${setNumber}에 대해 Google Search를 사용하여 실제 가격 정보를 조사해주세요.
+  const prompt = `LEGO #${setNumber} 분석. 현재가: ${currentPrice}원
 
-제품 번호: ${setNumber}${si ? `\n제품명: ${si.name}` : ''}${releaseYear ? `\n출시 연도: ${releaseYear}` : ''}${msrp ? `\n한국 정가(MSRP): ${msrp.toLocaleString()}원` : ''}
-사용자 현재 가격: ${currentPrice ? currentPrice + '원' : '미입력'}
-
-【분석 지시】한국 레고 시장 정보를 바탕으로 가격 분석을 수행하세요.
-
-【출력 규칙】
-- 검색에서 확인된 가격만 malls 배열에 포함 (추정 금지)
-- historicalData: 출시부터 현재까지 ${appState.chartInterval === 'monthly' ? '월별' : '주차별'} 새제품 가격 흐름 (최저 8개 포인트). 검색에서 특정 시점 가격이 확인되면 반드시 반영. 확인 안 된 구간은 LEGO 한국시장 패턴(정가→할인 이벤트→단종 후 상승)으로 추정하되 realistic하게 작성
-- historicalDataUsed: MISB 중고 가격 흐름 (출시 직후 정가 근처 → 단종 후 프리미엄 패턴)
-- malls의 url 필드는 반드시 "" (빈 문자열)
-- 데이터를 찾지 못한 숫자 필드는 null
-
-【JSON 형식으로만 출력】
+JSON으로만 답변 (다른 텍스트 없음):
 {
-  "title": "제품명 (한글 포함)",
-  "imageUrl": "https://images.brickset.com/sets/images/${setNumber}-1.jpg",
-  "status": "buy|wait|hold",
-  "statusText": "이모지 한줄 진단",
-  "summary": "2-3문장 분석 요약",
-  "evidence": "검색에서 찾은 근거 (가격 출처 명시)",
-  "tip": "구매 팁",
-  "originalPrice": ${msrp || 'null'},
-  "averagePrice": null,
-  "lowestPrice": null,
-  "lowestPriceDate": null,
-  "lowestPriceMall": null,
-  "pieceCount": ${si?.numParts || 'null'},
-  "ppp": null,
-  "usedPrices": { "misb": null, "mib": null, "used": null },
-  "retirementRisk": "low|medium|high",
-  "retirementReason": "단종 위험 근거",
-  "investmentScore": null,
-  "investmentReason": "재테크 분석",
-  "globalPrices": { "amazon": null, "bricklink": null, "currency": "USD" },
-  "malls": [{ "name": "쿠팡", "price": null, "discountRate": null, "url": "", "isLowest": false }],
-  "historicalData": [{ "date": "YYYY-MM-01", "price": 0, "mall": "출처", "mallUrl": "", "discountRate": 0 }],
-  "historicalDataUsed": [{ "date": "YYYY-MM-01", "price": 0, "mall": "번개장터", "mallUrl": "", "discountRate": 0 }]
-}
-
-한국어로 답변하세요. JSON 외 다른 텍스트 없이 JSON만 출력하세요.`;
+  "title":"제품명",
+  "imageUrl":"https://images.brickset.com/sets/images/${setNumber}-1.jpg",
+  "status":"buy|wait|expensive",
+  "statusText":"한줄평",
+  "summary":"분석요약",
+  "evidence":"근거",
+  "tip":"팁",
+  "originalPrice":null,
+  "averagePrice":null,
+  "lowestPrice":null,
+  "lowestPriceDate":null,
+  "lowestPriceMall":null,
+  "pieceCount":null,
+  "ppp":null,
+  "usedPrices":{"misb":null,"mib":null,"used":null},
+  "retirementRisk":"low|medium|high",
+  "retirementReason":"이유",
+  "investmentScore":0,
+  "investmentReason":"이유",
+  "globalPrices":{"amazon":null,"bricklink":null,"currency":"USD"},
+  "malls":[{"name":"","price":null,"discountRate":null,"url":"","isLowest":false}],
+  "historicalData":[{"date":"2024-01-01","price":null,"mall":"","mallUrl":"","discountRate":0}],
+  "historicalDataUsed":[{"date":"2024-01-01","price":null,"mall":"","mallUrl":"","discountRate":0}]
+}`;
 
   try {
     let text = null;
-    let usedModel = 'gemini';
     text = await callGemini(prompt);
     if (text === null) {
       throw new Error('모든 Gemini 키가 소진되었습니다. API 키를 추가하거나 나중에 다시 시도해주세요.');
@@ -590,7 +619,7 @@ window.analyzeLego = async () => {
     const parsed = extractJson(text);
     if (!parsed) throw new Error('JSON 파싱 실패. 다시 시도해주세요.');
     appState.result = parsed;
-    appState.result._usedModel = usedModel;
+    appState.result._usedModel = 'gemini';
     appState.activeTab = 'new';
     appState.usedCategory = 'misb';
     appState.period = 'all';

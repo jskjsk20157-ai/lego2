@@ -603,7 +603,10 @@ ${msrp ? `[중요] 정가(MSRP): ₩${msrp.toLocaleString()}원. 이것을 기�
         3. 부품 수(Piece Count)와 이미지 URL(imageUrl)을 확인하세요.
         4. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요.
         3. 출시 이후 쇼핑몰 할인/판매 가격 기록 (새상품 기준, historicalData 필드)
-           - Google Search로 커뮤니티 기반 가격 데이터 수집 (클리앙, 가격비교 사이트, SNS 등)
+           - Google Search로 커뮤니티 기반 가격 데이터 수집:
+             * 디씨 레고 갤러리 (DCinside LEGO Gallery)
+             * 브릭나라 (bricking.kr, Korean LEGO community)
+             * 클리앙, 뽐뿌, 가격비교 사이트, SNS 등
            - 검색어: "LEGO ${setNumber} 할인", "LEGO ${setNumber} 세일", "LEGO ${setNumber} [쇼핑몰명]"
            - 쇼핑몰 공식 API는 과거 데이터를 주지 않으니, 커뮤니티 거래/후기 정보 활용
            - 할인 여부 상관없이 모든 실제 판매 가격 포함 (정가도, 할인가도 모두 OK)

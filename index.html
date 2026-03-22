@@ -510,13 +510,18 @@ JSON만 출력 (다른 텍스트 없이):
     if (!fresh) throw new Error('파싱 실패');
 
     // 캐시된 결과에 현재 가격 데이터 덮어쓰기
+    if (!appState.result) {
+      showError('결과 데이터가 없습니다.');
+      if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '🔄 가격 새로고침'; }
+      return;
+    }
     const merged = { ...appState.result, ...fresh, _refreshedAt: new Date().toISOString() };
     // historicalData는 유지 + 새 데이터포인트 추가
-    if (fresh.malls?.length && appState.result.historicalData?.length) {
+    if (fresh.malls?.length && appState.result?.historicalData?.length) {
       const newPrice = fresh.malls.find(m => m.isLowest)?.price || fresh.averagePrice || fresh.lowestPrice;
       if (newPrice) {
         const today = new Date().toISOString().slice(0,7) + '-01';
-        const hist = appState.result.historicalData;
+        const hist = appState.result?.historicalData || [];
         if (!hist.find(d => d.date === today)) {
           hist.push({ date: today, price: newPrice, mall: fresh.lowestPriceMall || '최저가', mallUrl: '', discountRate: 0 });
         }

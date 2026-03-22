@@ -584,31 +584,48 @@ window.analyzeLego = async () => {
 
         제품 번호: ${setNumber}
         사용자가 입력한 현재 가격: ${currentPrice}원
-        데이터 간격 요구사항: ${targetInterval === 'weekly' ? '최근 6개월간 매주(Weekly) 단위의 정밀한 가격 데이터' : '출시 이후 매월(Monthly) 단위의 가격 데이터'}
 
         [분석 및 출력 요구사항]
         1. 제품명(title), 정가(MSRP), 부품 수(Piece Count), 이미지 URL(imageUrl - 공식 또는 고화질 예상 URL)을 확인하세요.
-        2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름, 그리고 해당 쇼핑몰의 당시 상품 URL(예상)을 포함하세요.
-        3. ${targetInterval === 'weekly' ? '최근 6개월간 주차별' : '출시 이후 월별'} 가격 변동 트렌드를 조사하세요. (새상품 기준, historicalData 필드)
-           - 데이터 포인트는 반드시 ${targetInterval === 'weekly' ? '20개 이상' : '12개 이상'} 포함되어야 합니다.
+        2. 역대 최저가(All-time Low)와 그 날짜, 쇼핑몰 이름을 포함하세요.
+        3. 출시 이후 월별 가격 변동 트렌드를 조사하세요. (새상품 기준, historicalData 필드)
+           - 데이터 포인트는 반드시 12개 이상 포함되어야 합니다.
            - 날짜 형식은 YYYY-MM-DD로 통일하세요.
-        4. 중고 시장(MISB 기준)의 동일 기간 가격 변동 트렌드도 함께 조사하세요. (historicalDataUsed 필드)
-        5. 현재 유통 중인 주요 쇼핑몰의 실시간 가격과 정확한 URL을 조사하세요.
-        6. 중고 시장 시세를 분석하세요 (MISB, MIB, Used).
-        7. 이 제품의 단종 예상 시기와 단종 위험도를 분석하세요.
-        8. 재테크 지수(0-100)와 해외 가격(Amazon, BrickLink)을 조사하세요.
+        4. 현재 유통 중인 주요 쇼핑몰의 실시간 가격을 조사하세요.
+        5. 이 제품의 단종 예상 시기와 단종 위험도를 분석하세요.
+        6. 재테크 지수(0-100)를 산정하세요.
 
         [출력 형식 - JSON]
         {
           "title": "제품명",
           "imageUrl": "이미지 URL",
           "status": "buy" | "wait" | "expensive",
-          "statusText": "...",
-          "summary": "...",
-          "evidence": "...",
-          "tip": "...",
+          "statusText": "한줄평",
+          "summary": "분석요약",
+          "evidence": "근거",
+          "tip": "팁",
           "originalPrice": 123000,
           "averagePrice": 110000,
+          "lowestPrice": 95000,
+          "lowestPriceDate": "2023-11-24",
+          "lowestPriceMall": "쇼핑몰명",
+          "pieceCount": 1500,
+          "ppp": 82,
+          "retirementRisk": "low" | "medium" | "high",
+          "retirementReason": "이유",
+          "investmentScore": 85,
+          "investmentReason": "이유",
+          "malls": [
+            { "name": "쇼핑몰", "price": 105000, "discountRate": 15, "url": "URL", "isLowest": true }
+          ],
+          "historicalData": [
+            { "date": "2024-01-01", "price": 123000 }
+          ]
+        }
+
+        반드시 한국어로 답변하세요.
+      `;
+
           "lowestPrice": 95000,
           "lowestPriceDate": "2023-11-24",
           "lowestPriceMall": "...",
